@@ -29,6 +29,8 @@ jobs:
           node --check static/visualization.js
           node --check static/cowork.js
           node --check static/guide.js
+          node --check static/workbench.js
+          node tests/workbench.cjs
       - name: Build standalone demo
         run: |
           python scripts/build_diagrams.py

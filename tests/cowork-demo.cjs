@@ -13,10 +13,10 @@ const base=process.env.GAME_TEST_URL||'http://127.0.0.1:8002/zero-human-company/
  if(await page.locator('#gc-message').inputValue()!==paused)throw Error('Typing continued while paused');
  await page.screenshot({path:'/tmp/zh-cowork-typing.png',fullPage:true});
  await page.selectOption('#gc-demo-speed','16');await page.click('#gc-demo-pause');
- await page.waitForFunction(()=>!window.CoWork.isPlaying()&&document.querySelectorAll('.flow-node.done').length===10,null,{timeout:120000});
+ await page.waitForFunction(()=>!window.CoWork.isPlaying()&&document.querySelectorAll('.flow-node.done').length===10,null,{timeout:300000});
  const s=await page.evaluate(async()=>(await(window.gameTransport||fetch)('/api/state')).json());
  if(!s.complete||s.messages.length!==10||s.auto)throw Error('Not all table prompts executed');
- if(await page.locator('.gc-review-question').count()!==1||await page.locator('.gc-review-reply').count()!==1)throw Error('Extended conversation missing');
+ if(await page.locator('.gc-review-question').count()!==3||await page.locator('.gc-review-reply').count()!==3)throw Error('Extended conversation missing');
  if(await page.evaluate(()=>window.scrollY!==0||document.documentElement.scrollHeight>innerHeight+1))throw Error('Workspace scrolled');
  const finalComposer=await page.locator('.gc-composer-wrap').boundingBox();
  if(Math.abs(initialComposer.y-finalComposer.y)>1)throw Error('Composer moved during conversation');

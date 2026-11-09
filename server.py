@@ -11,6 +11,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from scenario import transfers, WORK_NOTES
+from business_data import sources, partners
 
 ROOT = Path(__file__).parent
 ROLES = [
@@ -160,12 +161,13 @@ class Game:
             return {'Подарок': o['gift'], 'Получатели': 'Партнёры компании · демо-список', 'Срок': o['deadline'], 'Количество': 'Рассчитать по списку', 'Источник пропусков': 'Синтетический демо-бриф'}
         if i == 2:
             # Synthetic list contains 108 records and eight duplicated IDs.
-            records = list(range(1, 101)) + list(range(1, 9))
+            records = [r['recipient_id'] for r in partners() if r['selected']]
             base = len(set(records)); reserve = math.ceil(base*c['reserve']/100)
             o.update(base=base, reserve=reserve, quantity=base+reserve)
             return {'Записей': len(records), 'Исключено дублей': len(records)-base, 'Получателей': base, 'Резерв': reserve, 'Тираж': o['quantity']}
         if i == 3:
-            total = o['quantity'] * (420+80) + 5000
+            price = sources()['price']
+            total = o['quantity'] * (price['ball']+price['pack']) + price['delivery']
             o.update(total=total, unit_price=round(total/o['quantity'], 2))
             return {'Шар, ₽/шт': 420, 'Упаковка, ₽/шт': 80, 'Доставка, ₽': 5000, 'Всего, ₽': total, 'За единицу, ₽': o['unit_price'], 'Лимит, ₽': c['budget'], 'В лимите': total <= c['budget']}
         if i == 4:
@@ -234,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split('?')[0]
         if path == '/api/state': return self.respond(200, self.server.game.snapshot())
         if path == '/api/health': return self.respond(200, {'ok': True, 'mode': 'synthetic'})
-        files = {'/': ('index.html','text/html'), '/app.js': ('app.js','text/javascript'), '/style.css': ('style.css','text/css'), '/architecture.svg': ('architecture.svg','image/svg+xml'), '/visualization.js': ('visualization.js','text/javascript'), '/cowork.js': ('cowork.js','text/javascript'), '/guide.js': ('guide.js','text/javascript'), '/process.svg': ('process.svg','image/svg+xml'), '/request.svg': ('request.svg','image/svg+xml'), '/states.svg': ('states.svg','image/svg+xml'), '/hero-ring.png': ('hero-ring.png','image/png')}
+        files = {'/': ('index.html','text/html'), '/app.js': ('app.js','text/javascript'), '/style.css': ('style.css','text/css'), '/architecture.svg': ('architecture.svg','image/svg+xml'), '/visualization.js': ('visualization.js','text/javascript'), '/cowork.js': ('cowork.js','text/javascript'), '/guide.js': ('guide.js','text/javascript'), '/process.svg': ('process.svg','image/svg+xml'), '/request.svg': ('request.svg','image/svg+xml'), '/states.svg': ('states.svg','image/svg+xml'), '/hero-ring.png': ('hero-ring.png','image/png'), '/blue-knot.png': ('blue-knot.png','image/png'), '/business-data.js': ('business-data.js','text/javascript'), '/workbench.js': ('workbench.js','text/javascript')}
         if path not in files: return self.respond(404, {'error': 'Не найдено'})
         name, mime = files[path]; body = (ROOT/'static'/name).read_bytes()
         self.send_response(200); self.send_header('Content-Type', mime+'; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
