@@ -6,7 +6,7 @@ window.GameVisuals = (() => {
   const status = {waiting:'Ожидает входящие данные',ready:'Ваш ход',working:'Работает',approval:'Ждёт решения ведущего',done:'Результат передан'};
   const points = {1:[110,205],2:[330,110],3:[550,110],4:[330,320],5:[550,320],6:[790,205],7:[1030,205],8:[1030,515],9:[790,515],10:[550,515],0:[290,515]};
   const links = [
-    [1,2,'M200 180 C235 180 215 110 240 110','Посчитать тираж',140,105],
+    [1,2,'M200 180 C235 180 215 110 240 110','',140,105],
     [1,4,'M200 230 C235 230 215 320 240 320','Нужен макет',140,340],
     [2,3,'M420 110 L460 110','Тираж',440,92],
     [2,6,'M330 22 V8 H790 V117','Тираж',680,20],
@@ -83,10 +83,10 @@ window.GameVisuals = (() => {
       const done = sent.some(e=>e.data?.from===from&&e.data?.to===to);
       const active = s.running && last?.data?.from===from;
       const id=`edge-${from}-${to}`;
-      svg+=`<path id="${id}" d="${path}" class="flow-edge ${done?'sent':''}" marker-end="url(#flow-arrow${done?'-done':''})"/><rect x="${x-label.length*2.75-5}" y="${y-12}" width="${label.length*5.5+10}" height="19" rx="5" fill="#f8faf8"/><text x="${x}" y="${y+1}" class="edge-label">${h(label)}</text>`;
+      svg+=`<path id="${id}" d="${path}" class="flow-edge ${done?'sent':''}" marker-end="url(#flow-arrow${done?'-done':''})"/>`;
+      if(label)svg+=`<rect x="${x-label.length*2.75-5}" y="${y-12}" width="${label.length*5.5+10}" height="19" rx="5" fill="#f8faf8"/><text x="${x}" y="${y+1}" class="edge-label">${h(label)}</text>`;
 
     }
-    svg+=`<g class="human-node" data-open-cowork="1" tabindex="0" role="button" aria-label="Поставить задачу ИИ-помощнику" transform="translate(110,53)"><circle r="21" fill="#e7efe8"/><circle cy="-5" r="6" fill="#6e907c"/><path d="M-10 12Q-10 0 0 0T10 12" fill="#6e907c"/><text y="39">Человек ставит задачу</text></g><path d="M110 96V117" class="flow-edge" marker-end="url(#flow-arrow)"/>`;
     const involved=new Set(s.agents.filter(a=>['working','approval'].includes(a.status)).map(a=>a.id));
     for(const m of movers){involved.add(m.event.data.from);involved.add(m.event.data.to)}
     if(activeGame===s.id)for(const e of sent)if(!seen.has(e.id)){involved.add(e.data.from);involved.add(e.data.to)}
