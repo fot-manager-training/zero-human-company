@@ -18,20 +18,13 @@ function avatar(a){
 }
 function toast(text){$('#toast').textContent=text;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),5000)}
 async function api(path, payload){const r=await (window.gameTransport || fetch)(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw Error(data.error||'Ошибка сервера');await refresh();return data;}
-async function refresh(){if(pollBusy)return;pollBusy=true;try{const r=await (window.gameTransport || fetch)('/api/state');if(!r.ok)throw Error();const next=await r.json();$('#connection').textContent=window.gameTransport?'Браузерное демо':'Сервер на связи';if(next.revision!==lastRevision||next.id!==state?.id){state=next;lastRevision=next.revision;render();}}catch{$('#connection').textContent='Нет связи · повторяем…';}finally{pollBusy=false}}
+async function refresh(){if(pollBusy)return;pollBusy=true;try{const r=await (window.gameTransport || fetch)('/api/state');if(!r.ok)throw Error();const next=await r.json();$('#connection').textContent=window.gameTransport?'Сессия активна':'Сервер на связи';if(next.revision!==lastRevision||next.id!==state?.id){state=next;lastRevision=next.revision;render();}}catch{$('#connection').textContent='Нет связи · повторяем…';}finally{pollBusy=false}}
 function agentCard(a){return `<button class="agent ${a.status}" data-agent="${a.id}" aria-label="Стол ${a.id}: ${esc(a.name)}, ${states[a.status]}">${avatar(a)}<strong>${esc(a.name)}</strong><span class="table-num">СТОЛ ${String(a.id).padStart(2,'0')}</span><span class="agent-state">${a.status==='done'?'✓ ':''}${states[a.status]}</span></button>`}
 function time(t){return new Date(t*1000).toLocaleTimeString('ru-RU',{timeZone:'Europe/Moscow',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
 function eventFeed(e){return `<div class="feed-item"><time>${time(e.time)}</time><i class="event-marker ${e.kind}"></i><div>${e.table?`<p>Стол ${String(e.table).padStart(2,'0')} · ${esc(state.agents[e.table-1].name)}</p>`:''}${esc(e.text)}</div></div>`}
 function render(){
  const done=state.agents.filter(a=>a.status==='done').length, o=state.order;
- $('#progress-value').innerHTML=`${done} <small>/ 10 агентов</small>`;$('#progress-bar').style.width=done*10+'%';
- $('#quantity').innerHTML=`${o.quantity??'—'} <small>шт.</small>`;
- $('#reserve-label').textContent=o.quantity?`${o.base} получателей + ${o.reserve} в резерв`:'После расчёта партнёров';
- $('#cost').innerHTML=`${o.total?money(o.total):'—'} <small>₽</small>`;$('#budget-label').textContent=`Лимит ${money(state.config.budget)} ₽${o.total>state.config.budget?' · превышен':''}`;
  const approval=state.agents[5].status==='approval';
- $('#game-status').textContent=state.complete?'Готово к вручению':approval?'Нужно ваше решение':state.running?'Компания работает':state.started?'Прогон на паузе':'Готова к запуску';
- $('#status-sub').textContent=state.complete?'100 подарков ждут участников':approval?'Закупка ожидает ведущего':state.running?`${state.agents.filter(a=>a.status==='working').length} агентов в работе`:state.started?'Состояние сохранено':'Все агенты на своих местах';
-
  $('#feed').innerHTML=state.events.slice(-4).reverse().map(eventFeed).join('')||'<div class="empty">Здесь начнётся история вашей компании.<br>Запустите демо или отправьте первое поручение.</div>';
  $('#order-number').textContent=o.number||'ЧЕРНОВИК';
  $('#order-details').innerHTML=[['Подарок',o.gift||'Новогодний шар с логотипом'],['Срок',o.deadline||'10 декабря 2026'],['Макет',o.version?`${o.design} · ${o.color} · ${o.version}`:'Ожидает дизайнера'],['Получатели',o.base?`${o.base} партнёров`:'Из демо-списка']].map(([k,v])=>`<div class="order-row"><span>${k}</span><b>${esc(v)}</b></div>`).join('')+`<div class="order-note">${state.complete?'✓ По 10 подарков каждому столу. Резерв: '+o.reserve+' шт.':'Один заказ объединяет все десять команд.'}</div>`;
@@ -44,7 +37,7 @@ function render(){
  $('#auto-approve').checked=!!state.config.auto_approve;
  if(state.started)$('#manual').checked=!state.auto;
  $('#play').disabled=state.complete;$('#play').textContent=state.complete?'✓ Миссия выполнена':!state.started?'▶ Запустить демонстрацию':state.running?'Ⅱ Приостановить':'▶ Продолжить';
- renderTerminal();window.GameVisuals.render(state);if(modalAgent!==null)renderDetail(modalAgent);
+ renderTerminal();window.GameVisuals.render(state);window.CoWork.render(state,selected);if(modalAgent!==null)renderDetail(modalAgent);
 }
 function renderTerminal(){if(!$('#table-select').options.length)$('#table-select').innerHTML=state.agents.map(a=>`<option value="${a.id}">${String(a.id).padStart(2,'0')} · ${esc(a.name)}</option>`).join('');const a=state.agents[selected-1];$('#table-select').value=selected;$('#table-context').textContent=a.task+' · '+states[a.status];
  let html=state.messages.filter(m=>m.table===selected).map(m=>`<div class="chat-message"><small>СТОЛ ${selected} · ${m.source==='gigacowork'?'GIGACOWORK':'ТЕРМИНАЛ'}</small>${esc(m.text)}</div>`).join('');
@@ -55,28 +48,32 @@ function renderTerminal(){if(!$('#table-select').options.length)$('#table-select
  $('#send').disabled=!available;$('#message').disabled=!available;
  $('#message').placeholder=available?'Напишите поручение агенту…':a.status==='done'?'Результат передан следующему агенту':a.status==='working'?'Агент выполняет поручение…':'Ожидаем входящие данные';
 }
-function selectTable(n){selected=n;renderTerminal();$('#message').focus();}
-function showView(view){currentView=view;for(const key of ['company','conversation','architecture','tables','journal'])$('#'+key+'-view').classList.toggle('hidden',view!==key);document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));history.replaceState(null,'','#'+view);}
+function selectTable(n,openScreen=false){selected=n;if(openScreen||currentView==='cowork'){const url=new URL(location.href);url.searchParams.set('table',n);history.replaceState(null,'',url)}renderTerminal();window.CoWork.render(state,selected);if(openScreen)showView('cowork');}
+function showView(view){currentView=view;for(const key of ['company','cowork','conversation','architecture','tables','journal'])$('#'+key+'-view').classList.toggle('hidden',view!==key);document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));history.replaceState(null,'','#'+view);}
 function renderDetail(n){const a=state.agents[n-1];$('#agent-detail').innerHTML=`<div class="detail-avatar">${avatar(a)}</div><div class="dialog-eyebrow">СТОЛ ${String(n).padStart(2,'0')} / ${states[a.status]}</div><h2>${esc(a.name)}</h2><p>${esc(a.task)}</p><div class="detail-task">${esc(a.instruction)}<br><small>Демонстрационный движок исполняет фиксированные правила этой роли.</small></div>${a.output?'<h3>Результат работы</h3><table class="result-table">'+Object.entries(a.output).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(typeof v==='object'?Object.entries(v).map(([k,v])=>`Стол ${k}: ${v}`).join(' · '):v)}</td></tr>`).join('')+'</table>':'<p>Результат появится после выполнения задачи агентом.</p>'}<div class="dialog-actions"><button class="button primary-button" data-open-terminal="${n}">Открыть терминал стола →</button></div>`}
 async function safe(fn){try{await fn()}catch(e){toast(e.message)}}
 document.addEventListener('click',e=>{
  const view=e.target.closest('[data-view]');if(view)showView(view.dataset.view);
  const agent=e.target.closest('[data-agent]');if(agent){modalAgent=Number(agent.dataset.agent);renderDetail(modalAgent);$('#agent-dialog').showModal()}
- const table=e.target.closest('[data-table]');if(table)selectTable(Number(table.dataset.table));
- const open=e.target.closest('[data-open-terminal]');if(open){$('#agent-dialog').close();selectTable(Number(open.dataset.openTerminal))}
+ const table=e.target.closest('[data-table]');if(table)selectTable(Number(table.dataset.table),true);
+ const open=e.target.closest('[data-open-terminal]');if(open){$('#agent-dialog').close();selectTable(Number(open.dataset.openTerminal),true)}
  const speed=e.target.closest('[data-speed]');if(speed)safe(()=>api('/api/config',{speed:Number(speed.dataset.speed)}));
  if(e.target.closest('#approve'))safe(()=>api('/api/action',{action:'approve'}));
 });
 $('#agent-dialog .dialog-close').onclick=()=>$('#agent-dialog').close();$('#agent-dialog').addEventListener('close',()=>modalAgent=null);
 $('#table-select').onchange=e=>selectTable(Number(e.target.value));
-$('#message-form').onsubmit=e=>{e.preventDefault();safe(async()=>{if(!state.started){await saveConfig();await api('/api/action',{action:'set-mode',auto:!$('#manual').checked})}await api('/api/messages',{table_id:selected,text:$('#message').value,request_id:crypto.randomUUID()});$('#message').value=''})};
+async function submitTableMessage(table,text,ui='terminal'){
+ if(!state.started){await saveConfig();await api('/api/action',{action:'set-mode',auto:!$('#manual').checked})}
+ await api('/api/messages',{table_id:table,text,ui,request_id:crypto.randomUUID()});
+}
+$('#message-form').onsubmit=e=>{e.preventDefault();const text=$('#message').value;safe(async()=>{await submitTableMessage(selected,text);$('#message').value=''})};
 $('#message').onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('#message-form').requestSubmit()}};
 async function saveConfig(){await api('/api/config',{reserve:Number($('#reserve').value),budget:Number($('#budget').value),design:$('#design').value,speed:Number($('#speed').value),auto_approve:$('#auto-approve').checked})}
 $('#play').onclick=()=>safe(async()=>{if(!state.started){const auto=!$('#manual').checked;await saveConfig();await api('/api/action',{action:'start',auto})}else await api('/api/action',{action:state.running?'pause':'resume'})});
 $('#reset').onclick=()=>{quickPending=false;$('#reset-dialog').showModal()};$('#cancel-reset').onclick=()=>{quickPending=false;$('#reset-dialog').close()};$('#confirm-reset').onclick=()=>safe(async()=>{selected=1;await api('/api/action',{action:'reset'});$('#reset-dialog').close();$('#message').value='';if(quickPending){quickPending=false;await quickStart()}else toast('Новая компания готова к работе')});
 $('#export').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`company-${state.id}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 async function quickStart(){
- $('#auto-approve').checked=true;$('#manual').checked=false;await saveConfig();await api('/api/action',{action:'start',auto:true});showView('company');
+ $('#manual').checked=false;await saveConfig();await api('/api/action',{action:'start',auto:true});showView('company');
 }
 $('#quick-demo').onclick=()=>safe(async()=>{if(state.started){quickPending=true;$('#reset-dialog').showModal()}else await quickStart()});
 $('#flow-pause').onclick=()=>safe(()=>api('/api/action',{action:state.running?'pause':'resume'}));
@@ -85,4 +82,4 @@ $('#auto-approve').onchange=()=>safe(()=>api('/api/config',{auto_approve:$('#aut
 $('#manual').onchange=()=>{if($('#manual').checked){$('#auto-approve').checked=false;safe(()=>api('/api/config',{auto_approve:false}))}};
 $('#conversation-filter').onchange=()=>window.GameVisuals.render(state);
 document.addEventListener('keydown',e=>{const agent=e.target.closest('[data-agent]');if(agent&&(e.key==='Enter'||e.key===' ')){e.preventDefault();agent.dispatchEvent(new MouseEvent('click',{bubbles:true}))}});
-async function init(){await refresh();if(state){$('#table-select').innerHTML=state.agents.map(a=>`<option value="${a.id}">${String(a.id).padStart(2,'0')} · ${esc(a.name)}</option>`).join('');renderTerminal();}const initialView=location.hash.slice(1);if(['company','conversation','architecture','tables','journal'].includes(initialView))showView(initialView);setInterval(refresh,250)}init();
+async function init(){const requestedTable=Number(new URL(location.href).searchParams.get('table'));if(Number.isInteger(requestedTable)&&requestedTable>=1&&requestedTable<=10)selected=requestedTable;await refresh();if(state){$('#table-select').innerHTML=state.agents.map(a=>`<option value="${a.id}">${String(a.id).padStart(2,'0')} · ${esc(a.name)}</option>`).join('');renderTerminal();}const initialView=location.hash.slice(1)||(requestedTable>=1&&requestedTable<=10?'cowork':'');if(['company','cowork','conversation','architecture','tables','journal'].includes(initialView))showView(initialView);setInterval(refresh,250)}init();

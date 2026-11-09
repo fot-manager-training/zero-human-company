@@ -1,7 +1,7 @@
 // Loaded only in the GitHub Pages build. The server version uses the HTTP API.
 (() => {
   const data = window.ZH_DEMO_DATA;
-  const key = 'zh-company-browser-demo-v2';
+  const key = 'zh-company-browser-demo-v3';
   const copy = value => JSON.parse(JSON.stringify(value));
   const fresh = () => ({ ...copy(data.template), id: crypto.randomUUID().slice(0, 8) });
   let game;

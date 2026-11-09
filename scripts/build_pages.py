@@ -30,15 +30,15 @@ def build(destination):
             variants[str(reserve)+design] = {'outputs': outputs, 'orders': orders, 'conversations': conversations}
             game.db.close()
     template = Game.fresh()
-    template['config'].update(speed=2, auto_approve=True)
+    template['config'].update(speed=2, auto_approve=False)
     data = {'template': template, 'variants': variants, 'brief': DEFAULT_BRIEF, 'work_notes': WORK_NOTES}
     (destination/'demo-data.js').write_text('window.ZH_DEMO_DATA = '+json.dumps(data, ensure_ascii=False)+';\n')
-    for name in ('app.js', 'style.css', 'local-engine.js', 'architecture.svg', 'visualization.js'):
+    for name in ('app.js', 'style.css', 'local-engine.js', 'architecture.svg', 'visualization.js', 'cowork.js'):
         shutil.copyfile(ROOT/'static'/name, destination/name)
     html = (ROOT/'static/index.html').read_text()
     html = html.replace('<script src="./app.js">', '<script src="./demo-data.js"></script><script src="./local-engine.js"></script><script src="./app.js">')
-    html = html.replace('Сейчас это локальный чат. Внешние сообщения принимаются через API-адаптер GigaCoWork.', 'Браузерное демо: игра сохраняется только в этом браузере. Общий чат столов и GigaCoWork доступны в серверной версии.')
-    html = html.replace('Рабочее место ведущего', 'Браузерное демо · личная сессия')
+    html = html.replace('Сейчас это локальный чат. Внешние сообщения принимаются через API-адаптер GigaCoWork.', 'Учебная сессия сохраняется на этом устройстве. Для общей работы столов нужен сервер; внешний коннектор GigaCoWork ещё не подключён.')
+    html = html.replace('Рабочее место ведущего', 'Настройки ведущего')
     (destination/'index.html').write_text(html)
     (destination/'.nojekyll').touch()
     print(f'Built browser demo: {destination}')

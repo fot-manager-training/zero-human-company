@@ -22,24 +22,77 @@ window.GameVisuals = (() => {
   function summary(a,o) {
     return ({1:'Бриф → две ветки',2:o.quantity?`${o.quantity} шт. · резерв ${o.reserve}`:'108 записей → без дублей',3:o.total?`${o.total.toLocaleString('ru-RU')} ₽`:'Шары + упаковка + доставка',4:o.version?`Макет ${o.design} · ${o.version}`:'Подготовить версию макета',5:'Логотип · пропорции · цвет',6:a.status==='done'?'Заказ передан производителю':'Тираж + смета + макет',7:o.boxes?`${o.quantity} шт. · ${o.boxes} коробок`:'Изготовить и упаковать',8:'Производитель → площадка',9:o.accepted?`Принято ${o.accepted} шт.`:'Сверить партию с заказом',10:o.distributed?`100 выдать · ${o.reserve} запас`:'По 10 подарков на стол'})[a.id];
   }
+  const actions = {
+    1:['Структурирую поручение','Уточню поля, чтобы команда не потеряла задачу.'],
+    2:['Считаю получателей','Уберу повторы: один подарок на партнёра.'],
+    3:['Проверяю бюджет','Учту упаковку и доставку, чтобы смета была полной.'],
+    4:['Готовлю макет','Зафиксирую версию, чтобы все работали с одним файлом.'],
+    5:['Проверяю бренд','Сверю логотип и читаемость до отправки заказа.'],
+    6:['Собираю заказ','Проверю три входа; решение о закупке — за капитаном.'],
+    7:['Готовлю партию','Посчитаю коробки, чтобы логист знал объём.'],
+    8:['Организую доставку','Проверю адрес и срок, чтобы команда успела к событию.'],
+    9:['Сверяю приёмку','Сравню заказ и факт, чтобы заметить расхождения.'],
+    10:['Готовлю план выдачи','Оставлю резерв для дополнительных гостей.']
+  };
+  let activeGame=null, seen=new Set(), movers=[], snapshot=null, previousFrame=performance.now();
+  const ns='http://www.w3.org/2000/svg';
+  function brief(e,s){return ({1:e.data.to===2?'Рассчитай тираж по списку':'Подготовь макет для команды',2:`${s.order.quantity} подарков, без дублей`,3:`Полная смета: ${s.order.total} ₽`,4:`Макет ${s.order.design}, версия ${s.order.version}`,5:'Макет проверен, можно заказывать',6:`Заказ на ${s.order.quantity} подарков`,7:`Партия: ${s.order.boxes} коробок`,8:'Партия прибыла на площадку',9:`Принято ${s.order.accepted} подарков`,10:`100 к выдаче, ${s.order.reserve} в резерве`})[e.data.from]||'Передаю результат'}
+  function makeMover(e,s){
+    const layer=$('#motion-layer');
+    const route=links.find(l=>l[0]===e.data.from&&l[1]===e.data.to);
+    if(!layer||!route)return;
+    const start=points[e.data.from],end=points[e.data.to];
+    const path=document.createElementNS(ns,'path');
+    path.setAttribute('d',`M${start.join(' ')} ${route[2].replace(/^M/,'L')} L${end.join(' ')}`);
+    path.setAttribute('fill','none');path.setAttribute('stroke','none');layer.appendChild(path);
+    const person=document.createElementNS(ns,'g');person.setAttribute('class','running-agent');person.setAttribute('aria-label',`${names[e.data.from]} передаёт информацию: ${e.text}`);
+    const c=['#607aa8','#6e9e88','#ae9765','#a58bb4','#6c9d9c','#7b8da4','#c29a6a','#6c9eaf','#859f79','#b98c94'][e.data.from-1];
+    person.innerHTML=`<ellipse cx="0" cy="26" rx="22" ry="6" fill="#45674a28"/><g class="runner-body"><path class="run-leg left-leg" d="M-5 7L-13 23" stroke="#475d51" stroke-width="7" stroke-linecap="round"/><path class="run-leg right-leg" d="M5 7L14 23" stroke="#475d51" stroke-width="7" stroke-linecap="round"/><path d="M-15 5Q-15-20 0-20Q15-20 15 5Z" fill="${c}"/><circle cy="-31" r="11" fill="#f1cfaf"/><path d="M-11-32Q-12-46 0-45Q12-45 11-31L6-38Q0-34-8-38Z" fill="#595147"/><circle cx="-4" cy="-31" r="1.1"/><circle cx="4" cy="-31" r="1.1"/><path class="run-arm" d="M-12-12L-23-2M12-12L24-20" stroke="${c}" stroke-width="7" stroke-linecap="round"/><rect x="17" y="-34" width="20" height="26" rx="3" fill="#fff" stroke="#5c967a" stroke-width="1.5"/><path d="M21-26H32M21-21H32M21-16H29" stroke="#86ad96" stroke-width="1.5"/></g>`;
+    const bubble=document.createElementNS(ns,'g');bubble.setAttribute('class','moving-message');
+    bubble.innerHTML=`<rect x="-105" y="-24" width="210" height="49" rx="10"/><text y="-7">${h(names[e.data.from])} → ${h(names[e.data.to])}</text><text class="packet-text" y="12">${h(brief(e,s))}</text>`;
+    layer.appendChild(person);layer.appendChild(bubble);
+    movers.push({event:e,path,person,bubble,length:path.getTotalLength(),progress:0});
+  }
+  function animate(now){
+    const delta=Math.min(100,now-previousFrame);previousFrame=now;
+    const paused=snapshot&&!snapshot.running&&!snapshot.complete;
+    if(snapshot)for(const m of [...movers]){
+      if(!paused)m.progress+=delta/Math.max(650,2800/snapshot.config.speed);
+      const p=m.path.getPointAtLength(m.length*Math.min(1,m.progress));
+      m.person.setAttribute('transform',`translate(${p.x},${p.y})`);
+      m.bubble.setAttribute('transform',`translate(${Math.max(110,Math.min(1040,p.x))},${p.y<100?p.y+65:p.y-85})`);
+      m.person.classList.toggle('paused',paused);
+      const stride=Math.sin(m.progress*45)*9;
+      m.person.querySelector('.left-leg').setAttribute('d',`M-5 7L${-8+stride} 23`);
+      m.person.querySelector('.right-leg').setAttribute('d',`M5 7L${8-stride} 23`);
+      if(m.progress>=1){m.path.remove();m.person.remove();m.bubble.remove();movers=movers.filter(x=>x!==m)}
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
   function graph(s) {
     const sent = s.events.filter(e=>e.kind==='transfer');
     const last = sent.at(-1);
-    let svg = `<svg class="process-svg" viewBox="0 0 1150 635" role="group" aria-label="Движение заказа между десятью агентами"><defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9eb5aa"/></marker><marker id="flow-arrow-done" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2b9874"/></marker></defs><rect x="220" y="38" width="445" height="152" rx="18" fill="#f0f5fb"/><rect x="220" y="246" width="445" height="152" rx="18" fill="#f5f1f8"/><text x="235" y="32" class="branch-title">ВЕТКА 1 · КОЛИЧЕСТВО И БЮДЖЕТ</text><text x="235" y="242" class="branch-title">ВЕТКА 2 · МАКЕТ И ПРОВЕРКА</text><text x="730" y="420" class="branch-title">ИСПОЛНЕНИЕ И ВЫДАЧА ←</text>`;
+    let svg = `<svg class="process-svg" viewBox="0 0 1150 715" role="group" aria-label="Движение заказа между десятью агентами"><defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9eb5aa"/></marker><marker id="flow-arrow-done" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2b9874"/></marker></defs><rect x="220" y="38" width="445" height="152" rx="18" fill="#f0f5fb"/><rect x="220" y="246" width="445" height="152" rx="18" fill="#f5f1f8"/><text x="235" y="32" class="branch-title">ВЕТКА 1 · КОЛИЧЕСТВО И БЮДЖЕТ</text><text x="235" y="242" class="branch-title">ВЕТКА 2 · МАКЕТ И ПРОВЕРКА</text><text x="730" y="420" class="branch-title">ИСПОЛНЕНИЕ И ВЫДАЧА ←</text>`;
     for (const [from,to,path,label,x,y] of links) {
       const done = sent.some(e=>e.data?.from===from&&e.data?.to===to);
       const active = s.running && last?.data?.from===from;
       const id=`edge-${from}-${to}`;
       svg+=`<path id="${id}" d="${path}" class="flow-edge ${done?'sent':''}" marker-end="url(#flow-arrow${done?'-done':''})"/><rect x="${x-label.length*3.6-6}" y="${y-12}" width="${label.length*7.2+12}" height="19" rx="5" fill="#f8faf8"/><text x="${x}" y="${y+1}" class="edge-label">${h(label)}</text>`;
-      if(active)svg+=`<circle r="5" fill="#26a278"><animateMotion dur="1.3s" repeatCount="indefinite" path="${path}"/></circle>`;
+
     }
+    svg+=`<g class="human-node" data-open-cowork="1" tabindex="0" role="button" aria-label="Поставить задачу ИИ-помощнику" transform="translate(110,53)"><circle r="21" fill="#e7efe8"/><circle cy="-5" r="6" fill="#6e907c"/><path d="M-10 12Q-10 0 0 0T10 12" fill="#6e907c"/><text y="39">Человек ставит задачу</text></g><path d="M110 96V131" class="flow-edge" marker-end="url(#flow-arrow)"/>`;
     for(const a of s.agents){
       const [x,y]=points[a.id];
       const human=window.avatar(a).replace('<svg viewBox=', '<svg x="-31" y="-62" width="62" height="58" viewBox=');
-      svg+=`<g class="flow-node agent ${a.status}" data-agent="${a.id}" tabindex="0" role="button" aria-label="Стол ${a.id}: ${h(a.name)}, ${status[a.status]}" transform="translate(${x},${y})"><rect class="node-card" x="-90" y="-68" width="180" height="136" rx="12"/><text class="node-number" x="-76" y="-48">${String(a.id).padStart(2,'0')}</text>${human}<text class="node-name" y="8">${h(names[a.id])}</text><text class="node-summary" y="27">${h(summary(a,s.order))}</text><rect class="state-pill" x="-80" y="39" width="160" height="21" rx="5"/><text class="node-status" y="53">${h(status[a.status])}</text></g>`;
+      svg+=`<g class="flow-node agent ${a.status}" data-agent="${a.id}" tabindex="0" role="button" aria-label="Стол ${a.id}: ${h(a.name)}, ${status[a.status]}" transform="translate(${x},${y})"><rect class="node-card" x="-90" y="-68" width="180" height="136" rx="12"/><text class="node-number" x="-76" y="-48">${String(a.id).padStart(2,'0')}</text>${human}<text class="node-name" y="8">${h(names[a.id])}</text><text class="node-summary" y="27">${h(summary(a,s.order))}</text><rect class="state-pill" x="-80" y="39" width="160" height="21" rx="5"/><text class="node-status" y="53">${h(status[a.status])}</text>${['working','approval'].includes(a.status)?`<foreignObject x="-86" y="73" width="172" height="68"><div xmlns="http://www.w3.org/1999/xhtml" class="map-explanation"><b>${a.status==='approval'?'Человек проверяет смету':h(actions[a.id][0])}</b><span>${a.status==='approval'?'Я подготовил рекомендацию. Капитан, подтвердите решение.':h(actions[a.id][1])}</span><small>Пояснение по сценарию</small></div></foreignObject>`:''}</g>`;
     }
-    svg+=`<g transform="translate(290,515)"><rect x="-94" y="-55" width="188" height="110" rx="14" fill="${s.complete?'#e3f4e8':'#f0f4f1'}" stroke="#c6ddcd"/><text y="-17" class="finish-icon">${s.complete?'✓':'✧'}</text><text y="10" class="node-name">Готово к вручению</text><text y="32" class="node-summary">100 подарков + резерв</text></g><text x="25" y="618" class="branch-title">Нажмите на человечка — откроются инструкция и результат. Зелёная стрелка = результат передан.</text></svg>`;
-    $('#process-map').innerHTML=svg;
+    svg+=`<g transform="translate(290,515)"><rect x="-94" y="-55" width="188" height="110" rx="14" fill="${s.complete?'#e3f4e8':'#f0f4f1'}" stroke="#c6ddcd"/><text y="-17" class="finish-icon">${s.complete?'✓':'✧'}</text><text y="10" class="node-name">Команда вручает подарки</text><text y="32" class="node-summary">100 подарков + резерв</text></g><text x="25" y="694" class="branch-title">Человечки доставляют данные. В облачках — сообщения и краткие пояснения действий по сценарию.</text></svg>`;
+    if(!$('#map-base'))$('#process-map').innerHTML='<div id="map-base"></div><svg id="motion-layer" class="motion-layer" viewBox="0 0 1150 715" aria-label="Агенты доставляют информацию"></svg>';
+    $('#map-base').innerHTML=svg;
+    snapshot=s;
+    if(activeGame!==s.id){activeGame=s.id;seen=new Set(s.events.map(e=>e.id));movers=[];$('#motion-layer').innerHTML=''}
+    for(const e of s.events)if(!seen.has(e.id)){seen.add(e.id);if(e.kind==='transfer')makeMover(e,s)}
   }
   function conversation(e,s){
     const from=(e.kind==='ingress'||(e.kind==='human'&&e.data))?0:e.data?.from??e.table??0;
@@ -51,7 +104,7 @@ window.GameVisuals = (() => {
     graph(s);
     const active=s.agents.filter(a=>a.status==='working');
     const gate=s.agents[5].status==='approval';
-    $('#now-doing').innerHTML=`<span class="live-dot"></span><div><b>${s.complete?'Заказ выполнен':!s.started?'Начните с полного автопрогона':!s.running?'Эмуляция на паузе':gate?'Решение ведущего':active.length?active.map(a=>names[a.id]).join(' + '):'Передача задач'}</b><span>${s.complete?`100 подарков по столам. Резерв: ${s.order.reserve} шт.`:!s.started?'Наблюдайте за стрелками и читайте сообщения под схемой.':gate?(s.config.auto_approve?'Демо-ведущий согласует заказ автоматически, если смета в лимите.':'Нажмите «Согласовать» под схемой.'):active.length?active.map(a=>a.task).join(' · '):'Все результаты и сообщения сохраняются в журнале.'}</span></div>`;
+    $('#now-doing').innerHTML=`<span class="live-dot"></span><div><b id="game-status">${s.complete?'Готово к вручению':!s.started?'Начните с задачи человека':!s.running?'Прогон на паузе':gate?'Решение ведущего':active.length?active.map(a=>names[a.id]).join(' + '):'Передача задач'}</b><span>${s.complete?`100 подарков по столам. Резерв: ${s.order.reserve} шт.`:!s.started?'Откройте GigaCoWork своего стола или запустите пример совместной работы.':gate?(s.config.auto_approve?'В этом автопоказе решение капитана воспроизводится по сценарию.':'Нажмите «Согласовать» под схемой.'):active.length?active.map(a=>a.task).join(' · '):'Все результаты и сообщения сохраняются в журнале.'}</span></div>`;
     const last=s.events.filter(e=>e.kind==='transfer').at(-1);
     $('#handoff-live').innerHTML=last?`<span class="handoff-icon">↗</span><div><b>${h(names[last.data.from])} → ${h(names[last.data.to])}</b><p>${h(last.text)}</p></div>`:'<span class="handoff-icon">↗</span><div><b>Здесь появится последняя передача</b><p>Например: партнёры → финансы: «Тираж 110 шт., рассчитай стоимость».</p></div>';
     const messages=s.events.filter(e=>['transfer','dialogue','human','ingress'].includes(e.kind));
@@ -63,7 +116,7 @@ window.GameVisuals = (() => {
     document.querySelectorAll('[data-speed]').forEach(el=>el.classList.toggle('active',Number(el.dataset.speed)===s.config.speed));
     $('#flow-pause').disabled=!s.started||s.complete;
     $('#flow-pause').textContent=s.running?'Ⅱ Пауза':'▶ Продолжить';
-    $('#quick-demo').textContent=s.complete?'↺ Повторить автопрогон':s.started?'↺ Новый автопрогон':'▶ Полный автопрогон';
+    $('#quick-demo').textContent=s.complete?'↺ Повторить автопрогон':s.started?'↺ Повторить совместную работу':'▶ Показать совместную работу';
   }
   return {render};
 })();

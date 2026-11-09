@@ -27,5 +27,6 @@ jobs:
           node --check static/app.js
           node --check static/local-engine.js
           node --check static/visualization.js
+          node --check static/cowork.js
       - name: Build standalone demo
         run: python scripts/build_pages.py
