@@ -1,0 +1,47 @@
+const {chromium} = require('playwright');
+const base = process.env.GAME_TEST_URL || 'http://127.0.0.1:8002/zero-human-company/';
+(async () => {
+  const browser = await chromium.launch({executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox']});
+  try {
+    const page = await browser.newPage({viewport: {width:1440,height:1100}});
+    const errors=[];
+    page.on('pageerror', e=>errors.push(e.message));
+    await page.goto(base);
+    await page.waitForSelector('.flow-node');
+    await page.evaluate(async()=>{await (window.gameTransport||fetch)('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})})});
+    await page.reload();
+    await page.waitForSelector('.flow-node');
+    await page.click('[data-speed="1"]');
+    await page.click('#quick-demo');
+    await page.waitForSelector('.flow-node.working');
+    await page.click('#flow-pause');
+    await page.waitForFunction(()=>document.querySelector('#game-status').textContent==='Прогон на паузе');
+    const getState=()=>page.evaluate(async()=>(await (window.gameTransport||fetch)('/api/state')).json());
+    const paused=await getState();
+    await page.waitForTimeout(700);
+    if((await getState()).events.length!==paused.events.length)throw Error('Paused game continued');
+    await page.click('[data-speed="16"]');
+    await page.waitForFunction(()=>document.querySelector('[data-speed="16"]').classList.contains('active'));
+    await page.click('#flow-pause');
+    await page.waitForFunction(()=>document.querySelector('#game-status').textContent==='Готово к вручению',null,{timeout:15000});
+    const s=await getState();
+    if(s.order.quantity!==110||s.order.total!==60000||!s.config.auto_approve)throw Error('Wrong synthetic result');
+    if(s.events.filter(e=>e.kind==='transfer').length!==12)throw Error('Missing transfers');
+    if(await page.locator('.flow-edge.sent').count()!==12)throw Error('Map does not match messages');
+    await page.screenshot({path:'/tmp/zh-simulation-map.png',fullPage:true});
+    await page.click('.tab[data-view="conversation"]');
+    if(await page.locator('#conversation-list .transfer').count()!==12)throw Error('Wrong transcript');
+    await page.selectOption('#conversation-filter','3');
+    if(await page.locator('#conversation-list .transfer').count()!==2)throw Error('Wrong filtered transcript');
+    await page.screenshot({path:'/tmp/zh-simulation-conversation.png',fullPage:true});
+    await page.click('.tab[data-view="architecture"]');
+    await page.waitForFunction(()=>document.querySelector('.architecture-image').naturalWidth>0);
+    const downloadPromise=page.waitForEvent('download');
+    await page.locator('a[download]').click();
+    const download=await downloadPromise;
+    if(download.suggestedFilename()!=='business-game-architecture.svg')throw Error('Missing SVG download');
+    await page.screenshot({path:'/tmp/zh-simulation-architecture.png',fullPage:true});
+    if(errors.length)throw Error(errors.join('\n'));
+    console.log('PASS: one-click autopilot, live speed 16, pause, 12 map handoffs, dialogue filter, architecture SVG');
+  } finally {await browser.close()}
+})().catch(e=>{console.error(e);process.exit(1)});

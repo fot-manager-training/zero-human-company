@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from server import Game, GameError
 
@@ -79,5 +80,36 @@ class GameTests(unittest.TestCase):
         self.assertNotEqual(self.g.state['id'],old)
         self.assertEqual(self.g.state['events'],[])
         self.assertFalse(self.g.state['started'])
+
+    def test_synthetic_approval_and_real_handoff_events(self):
+        self.g.configure({'auto_approve': True, 'speed': 16})
+        self.g.action({'action':'start'})
+        for _ in range(15): self.advance()
+        state = self.g.snapshot()
+        self.assertTrue(state['complete'])
+        transfers = [e['data'] for e in state['events'] if e['kind'] == 'transfer']
+        self.assertEqual(len(transfers), 12)
+        self.assertEqual({t['to'] for t in transfers if t['from'] == 1}, {2, 4})
+        self.assertEqual({t['from'] for t in transfers if t['to'] == 6}, {2, 3, 5})
+        self.assertIn('110', next(t['text'] for t in transfers if t['from'] == 2))
+        self.assertEqual(transfers[-1]['to'], 0)
+        self.assertTrue(any(e['kind'] == 'human' and e.get('data', {}) and e['data'].get('synthetic') for e in state['events']))
+        self.assertEqual(len([e for e in state['events'] if e['kind']=='dialogue']), 10)
+
+    def test_live_speed_scales_remaining_time_and_preserves_pause(self):
+        with patch('server.time.time', return_value=100):
+            self.g.action({'action':'start'})
+            self.g.tick(100)
+            self.assertEqual(self.g.state['agents'][0]['due'], 103)
+            self.g.configure({'speed': 16})
+            self.assertAlmostEqual(self.g.state['agents'][0]['due'], 100.1875)
+            self.g.action({'action':'pause'})
+            self.g.configure({'speed': 8})
+            self.assertAlmostEqual(self.g.state['agents'][0]['due'], 100.375)
+        with patch('server.time.time', return_value=200):
+            self.g.action({'action':'resume'})
+            self.assertAlmostEqual(self.g.state['agents'][0]['due'], 200.375)
+            self.g.tick(200.5)
+            self.assertEqual(self.g.state['agents'][0]['status'], 'done')
 
 if __name__=='__main__': unittest.main()

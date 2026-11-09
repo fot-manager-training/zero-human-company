@@ -27,6 +27,7 @@ async function run() {
     await reset();
     await page.screenshot({ path: '/tmp/zh-initial.png', fullPage: true });
     await page.selectOption('#speed', '4');
+    await page.uncheck('#auto-approve');
     await page.click('#play');
     await page.waitForSelector('#approve', { timeout: 20000 });
     await page.screenshot({ path: '/tmp/zh-approval.png', fullPage: true });
@@ -66,6 +67,13 @@ async function run() {
     const state = standalone
       ? await page.evaluate(async () => (await window.gameTransport('/api/state')).json())
       : await (await page.request.get(base + '/api/state')).json();
+    if (state.events.filter(e => e.kind === 'transfer').length !== 12) throw Error('Missing agent handoffs');
+    await page.click('.tab[data-view="conversation"]');
+    if (await page.locator('#conversation-list .transfer').count() !== 12) throw Error('Missing conversation');
+    await page.selectOption('#conversation-filter', '3');
+    if (await page.locator('#conversation-list .transfer').count() !== 2) throw Error('Wrong conversation filter');
+    await page.click('.tab[data-view="architecture"]');
+    if (!await page.locator('.architecture-image').evaluate(img => img.complete && img.naturalWidth > 0)) throw Error('Missing architecture diagram');
     if (state.auto || state.messages.length !== 10 || state.order.distributed !== 100) throw Error('Manual chain failed');
     if (errors.length) throw Error(errors.join('\n'));
     console.log('PASS: auto and manual chains, human approval, results, journal, terminals, mobile, no browser errors');

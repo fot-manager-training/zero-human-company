@@ -10,6 +10,7 @@ import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from scenario import transfers, WORK_NOTES
 
 ROOT = Path(__file__).parent
 ROLES = [
@@ -46,7 +47,7 @@ class Game:
     @staticmethod
     def fresh():
         return {'id': uuid.uuid4().hex[:8], 'revision': 0, 'running': False, 'started': False,
-                'complete': False, 'auto': True, 'approval': False, 'config': {'reserve': 10, 'budget': 80000, 'design': 'A', 'speed': 1},
+                'complete': False, 'auto': True, 'approval': False, 'config': {'reserve': 10, 'budget': 80000, 'design': 'A', 'speed': 1, 'auto_approve': False},
                 'order': {}, 'agents': [{'id': i, 'name': r[0], 'task': r[1], 'key': r[2], 'status': 'waiting', 'output': None,
                 'instruction': f'Ты — агент роли «{r[0]}». {r[1]}. Используй демо-бриф и передай структурированный результат следующей роли.'}
                 for i, r in enumerate(ROLES, 1)], 'events': [], 'messages': [], 'receipts': {}}
@@ -65,15 +66,22 @@ class Game:
 
     def configure(self, payload):
         with self.lock:
-            if self.state['started']:
-                raise GameError('Параметры фиксируются при запуске. Создайте новую игру для изменения.')
+            if self.state['started'] and set(payload) - {'speed', 'auto_approve'}:
+                raise GameError('Параметры заказа фиксируются при запуске. Скорость можно менять во время игры.')
             config = dict(self.state['config'])
             for key, value in payload.items():
                 if key == 'reserve' and type(value) is int and value in (5, 10): config[key] = value
                 elif key == 'budget' and type(value) is int and 10000 <= value <= 1000000: config[key] = value
                 elif key == 'design' and value in ('A', 'B', 'C'): config[key] = value
-                elif key == 'speed' and type(value) in (int, float) and value in (1, 2, 4): config[key] = value
+                elif key == 'speed' and type(value) in (int, float) and value in (1, 2, 4, 8, 16): config[key] = value
+                elif key == 'auto_approve' and type(value) is bool: config[key] = value
                 else: raise GameError('Некорректный параметр: ' + key)
+            anchor = self.state.get('paused_at') or time.time()
+            ratio = self.state['config']['speed'] / config['speed']
+            for agent in self.state['agents']:
+                if agent.get('due') is not None: agent['due'] = anchor + max(0, agent['due'] - anchor) * ratio
+            if self.state.get('approval_due') is not None:
+                self.state['approval_due'] = anchor + max(0, self.state['approval_due'] - anchor) * ratio
             self.state['config'] = config
             self.save()
 
@@ -104,6 +112,7 @@ class Game:
             result = {'accepted': True, 'game_id': self.state['id'], 'table_id': table}
             if key: self.state['receipts'][key] = result
             self.event('message', text, table)
+            self.event('ingress', 'Участник → чат GigaCoWork (эмуляция) → API → оркестратор: поручение принято.', table, {'from': 0, 'to': table, 'source': payload.get('source', 'terminal')})
             self.save()
             return result
 
@@ -123,17 +132,25 @@ class Game:
                 if self.state['started']: raise GameError('Заказ уже запущен')
                 self.state['auto'] = payload.get('auto', True) is not False
                 return self.message({'table_id': 1, 'text': DEFAULT_BRIEF, 'source': 'demo'})
-            if name == 'pause': self.state['running'] = False
+            if name == 'pause':
+                if self.state['running']: self.state['paused_at'] = time.time()
+                self.state['running'] = False
             elif name == 'resume':
                 if not self.state['started'] or self.state['complete']: raise GameError('Нет активного заказа')
+                if self.state.get('paused_at'):
+                    elapsed = time.time() - self.state.pop('paused_at')
+                    for agent in self.state['agents']:
+                        if agent.get('due') is not None: agent['due'] += elapsed
+                    if self.state.get('approval_due') is not None: self.state['approval_due'] += elapsed
                 self.state['running'] = True
             elif name == 'approve':
                 if self.state['agents'][5]['status'] != 'approval': raise GameError('Согласование пока не требуется')
                 if self.state['order']['total'] > self.state['config']['budget']: raise GameError('Смета превышает лимит. Начните новую игру с достаточным бюджетом.')
                 self.state['approval'] = True
-                self.event('human', 'Ведущий согласовал закупку. Заказ передан поставщику.', 6)
+                self.event('human', ('Демо-ведущий автоматически согласовал закупку.' if payload.get('synthetic') else 'Ведущий согласовал закупку.') + ' Заказ передан поставщику.', 6, {'synthetic': bool(payload.get('synthetic'))})
+                self.event('dialogue', WORK_NOTES[6], 6)
                 self.state['agents'][5]['status'] = 'working'
-                self.state['agents'][5]['due'] = time.time() + 1
+                self.state['agents'][5]['due'] = time.time() + 3 / self.state['config']['speed']
             else: raise GameError('Неизвестное действие')
             self.save()
 
@@ -180,6 +197,8 @@ class Game:
                 if a['status'] == 'working' and a.get('due', float('inf')) <= now:
                     a['output'] = self.output(a['id']); a['status'] = 'done'
                     self.event('result', 'Результат готов: ' + a['task'].lower(), a['id'], a['output'])
+                    for transfer in transfers(a['id'], self.state['order']):
+                        self.event('transfer', transfer['text'], a['id'], transfer)
                     changed = True
             for a in self.state['agents']:
                 if a['status'] in ('waiting', 'ready') and self.ready(a['id']):
@@ -188,12 +207,17 @@ class Game:
                     if self.state['auto'] or a.get('requested'):
                         if a['id'] == 6 and not self.state['approval']:
                             a['status'] = 'approval'
-                            self.event('human', 'Требуется согласование закупки ведущим.', 6)
+                            self.state['approval_due'] = now + 3 / self.state['config']['speed']
+                            self.event('human', 'Закупки → ведущему: тираж, смета и макет готовы. Разрешаете разместить заказ?', 6)
                         else:
                             a['status'] = 'working'
                             a['due'] = now + 3 / self.state['config']['speed']
                             self.event('agent', 'Агент работает: ' + a['task'].lower(), a['id'])
+                            self.event('dialogue', WORK_NOTES[a['id']], a['id'])
                         changed = True
+            if self.state['agents'][5]['status'] == 'approval' and self.state['config'].get('auto_approve') and now >= self.state.get('approval_due', now + 1) and self.state['order']['total'] <= self.state['config']['budget']:
+                self.action({'action': 'approve', 'synthetic': True})
+                changed = True
             if all(a['status'] == 'done' for a in self.state['agents']):
                 self.state.update(complete=True, running=False)
                 self.event('complete', 'Готово к вручению! 100 подарков распределены по 10 столам, резерв сохранён.')
@@ -210,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split('?')[0]
         if path == '/api/state': return self.respond(200, self.server.game.snapshot())
         if path == '/api/health': return self.respond(200, {'ok': True, 'mode': 'synthetic'})
-        files = {'/': ('index.html','text/html'), '/app.js': ('app.js','text/javascript'), '/style.css': ('style.css','text/css')}
+        files = {'/': ('index.html','text/html'), '/app.js': ('app.js','text/javascript'), '/style.css': ('style.css','text/css'), '/architecture.svg': ('architecture.svg','image/svg+xml'), '/visualization.js': ('visualization.js','text/javascript')}
         if path not in files: return self.respond(404, {'error': 'Не найдено'})
         name, mime = files[path]; body = (ROOT/'static'/name).read_bytes()
         self.send_response(200); self.send_header('Content-Type', mime+'; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)

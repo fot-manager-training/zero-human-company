@@ -42,3 +42,6 @@ jobs:
         run: |
           curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors "$DEMO_URL" -o /tmp/zh-demo.html
           python -c 'from pathlib import Path; content = Path("/tmp/zh-demo.html").read_text(); assert "./local-engine.js" in content and "./app.js" in content, "Published demo is incomplete"'
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "${DEMO_URL}architecture.svg" -o /tmp/zh-architecture.svg
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "${DEMO_URL}visualization.js" -o /tmp/zh-visualization.js
+          python -c 'from pathlib import Path; assert "GigaNetwork" in Path("/tmp/zh-architecture.svg").read_text(); assert "GameVisuals" in Path("/tmp/zh-visualization.js").read_text()'

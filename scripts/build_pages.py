@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from server import Game, DEFAULT_BRIEF
+from scenario import transfers, WORK_NOTES
 
 
 def build(destination):
@@ -20,16 +21,19 @@ def build(destination):
             initial = game.snapshot()
             outputs = []
             orders = []
+            conversations = []
             for i in range(1, 11):
                 before = dict(game.state['order'])
                 outputs.append(game.output(i))
+                conversations.append(transfers(i, game.state["order"]))
                 orders.append({k: v for k, v in game.state['order'].items() if before.get(k) != v})
-            variants[str(reserve)+design] = {'outputs': outputs, 'orders': orders}
+            variants[str(reserve)+design] = {'outputs': outputs, 'orders': orders, 'conversations': conversations}
             game.db.close()
     template = Game.fresh()
-    data = {'template': template, 'variants': variants, 'brief': DEFAULT_BRIEF}
+    template['config'].update(speed=2, auto_approve=True)
+    data = {'template': template, 'variants': variants, 'brief': DEFAULT_BRIEF, 'work_notes': WORK_NOTES}
     (destination/'demo-data.js').write_text('window.ZH_DEMO_DATA = '+json.dumps(data, ensure_ascii=False)+';\n')
-    for name in ('app.js', 'style.css', 'local-engine.js'):
+    for name in ('app.js', 'style.css', 'local-engine.js', 'architecture.svg', 'visualization.js'):
         shutil.copyfile(ROOT/'static'/name, destination/name)
     html = (ROOT/'static/index.html').read_text()
     html = html.replace('<script src="./app.js">', '<script src="./demo-data.js"></script><script src="./local-engine.js"></script><script src="./app.js">')
