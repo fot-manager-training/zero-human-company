@@ -1,5 +1,6 @@
 // Destructive smoke test: use a dedicated demo server and database.
 const { chromium } = require('playwright');
+const standalone = process.env.GAME_TEST_MODE === 'browser';
 const base = process.env.GAME_TEST_URL || 'http://127.0.0.1:8001';
 async function run() {
   const browser = await chromium.launch({
@@ -12,8 +13,14 @@ async function run() {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     const reset = async () => {
-      const response = await page.request.post(base + '/api/action', { data: { action: 'reset' } });
-      if (!response.ok()) throw Error('Reset failed');
+      if (standalone) {
+        await page.goto(base);
+        await page.waitForSelector('.agent');
+      }
+      const response = standalone
+        ? await page.evaluate(async () => { const r = await window.gameTransport('/api/action', {body: JSON.stringify({action: 'reset'})}); return {ok: r.ok}; })
+        : await page.request.post(base + '/api/action', { data: { action: 'reset' } });
+      if (!(standalone ? response.ok : response.ok())) throw Error('Reset failed');
       await page.goto(base);
       await page.waitForSelector('.agent');
     };
@@ -56,7 +63,9 @@ async function run() {
       }
     }
     await page.waitForFunction(() => document.querySelector('#game-status').textContent === 'Готово к вручению');
-    const state = await (await page.request.get(base + '/api/state')).json();
+    const state = standalone
+      ? await page.evaluate(async () => (await window.gameTransport('/api/state')).json())
+      : await (await page.request.get(base + '/api/state')).json();
     if (state.auto || state.messages.length !== 10 || state.order.distributed !== 100) throw Error('Manual chain failed');
     if (errors.length) throw Error(errors.join('\n'));
     console.log('PASS: auto and manual chains, human approval, results, journal, terminals, mobile, no browser errors');

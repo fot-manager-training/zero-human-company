@@ -23,4 +23,8 @@ jobs:
       - name: Run game and HTTP API tests
         run: python -m unittest discover -s tests -v
       - name: Check browser script syntax
-        run: node --check static/app.js
+        run: |
+          node --check static/app.js
+          node --check static/local-engine.js
+      - name: Build standalone demo
+        run: python scripts/build_pages.py
