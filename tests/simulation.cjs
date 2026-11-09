@@ -12,7 +12,7 @@ const base = process.env.GAME_TEST_URL || 'http://127.0.0.1:8002/zero-human-comp
     await page.reload();
     await page.waitForSelector('.flow-node');
     await page.click('[data-speed="1"]');
-    await page.check('#auto-approve');
+    await page.evaluate(()=>window.api('/api/config',{auto_approve:true}));
     await page.click('#quick-demo');
     await page.waitForSelector('.flow-node.working');
     await page.click('#flow-pause');

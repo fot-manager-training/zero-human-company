@@ -11,7 +11,8 @@ const base=process.env.GAME_TEST_URL||'http://127.0.0.1:8002/zero-human-company/
   for(const selector of ['.metrics','.hero-card','.eyebrow','#progress-value'])if(await page.locator(selector).count())throw Error('Removed element remains: '+selector);
   if((await page.locator('body').innerText()).includes('Браузерное демо'))throw Error('Removed phrase remains');
   if(await page.locator('.flow-node.collapsed').count()!==10)throw Error('Inactive agents must be collapsed');
-  if(await page.locator('#auto-approve').isChecked())throw Error('Human decision must be the default');
+  if((await page.evaluate(async()=>(await(window.gameTransport||fetch)('/api/state')).json())).config.auto_approve)throw Error('Human decision must be the default');
+  if(await page.locator('.console,#tables-view,#handoff-live').count())throw Error('Removed console or terminals remain');
   await page.click('.tab[data-view="cowork"]');
   if(await page.locator('#gc-table-select option').count()!==10)throw Error('Expected 10 workspaces');
   await page.selectOption('#gc-table-select','3');

@@ -38,8 +38,6 @@ def build(destination):
         shutil.copyfile(ROOT/'static'/name, destination/name)
     html = (ROOT/'static/index.html').read_text()
     html = html.replace('<script src="./app.js">', '<script src="./demo-data.js"></script><script src="./local-engine.js"></script><script src="./app.js">')
-    html = html.replace('Сейчас это локальный чат. Внешние сообщения принимаются через API-адаптер GigaCoWork.', 'Учебная сессия сохраняется на этом устройстве. Для общей работы столов нужен сервер; внешний коннектор GigaCoWork ещё не подключён.')
-    html = html.replace('Рабочее место ведущего', 'Настройки ведущего')
     assets = sorted(p for p in destination.iterdir() if p.suffix in ('.js', '.css', '.svg'))
     version = hashlib.sha256(b''.join(p.read_bytes() for p in assets)).hexdigest()[:12]
     for asset in assets:

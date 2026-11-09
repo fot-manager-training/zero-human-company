@@ -3,13 +3,13 @@ window.CoWork = (() => {
   const h = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const $ = s => document.querySelector(s);
   let latest=null, selected=1, busy=false, lastSignature='', lastGame=null;
-  const drafts={}, attached={};
+  const drafts={}, attached={}, reviewChats={};
   const demo={active:false,paused:false,token:0,caption:'Покажем ввод поручений, помощь ИИ и проверку результатов.',stage:''};
   const suggestions = ['Подготовить документ','Посчитать или свести данные','Быстро разобраться в задаче'];
   const files = ['Демо-бриф мероприятия','Список партнёров: 108 записей','Прайс: шар, упаковка, доставка','Демо-брендбук и макеты','Чек-лист приёмки'];
   const ready = a => (!latest.started&&a.id===1)||(latest.started&&!latest.complete&&a.status==='ready');
   function shell(){
-    $('#cowork-screen').innerHTML=`<div class="gc-app"><aside class="gc-rail"><span class="gc-rail-symbol">◫</span><button data-gc-action="search" aria-label="Найти стол">⌕</button><button class="selected" data-gc-action="spaces" aria-label="Все пространства">▱</button><button data-view="company" aria-label="Посмотреть работу команды">↗</button><div class="gc-rail-bottom"><button data-gc-action="help" aria-label="Как играть">?</button><span>УЧ</span></div></aside><aside class="gc-sidebar"><div class="gc-logo" aria-label="GigaCoWork">GIGA<br>COWORK</div><button data-gc-action="personal">Личное пространство</button><button data-gc-action="spaces">Все пространства</button><div class="gc-section-heading">Избранные <span>⌄</span></div><div id="gc-spaces"></div><button class="gc-muted" data-gc-action="spaces">Показать все столы</button><div class="gc-section-heading">Недавние <span>⌄</span></div><button id="gc-recent" data-gc-action="personal"></button><div class="gc-sidebar-note">Человек формулирует задачу.<br>ИИ готовит результат.<br>Человек проверяет и решает.</div></aside><main class="gc-main"><div class="gc-topbar"><button class="gc-back" data-gc-action="spaces">☰ Столы</button><div class="gc-participants"><span>К</span><span>М</span><span>Д</span><span>П</span></div><label class="gc-select-wrap"><span class="sr-only">Рабочее место стола</span><select id="gc-table-select"></select></label><button class="gc-more" data-gc-action="context" aria-label="Контекст стола">⋮</button></div><div class="gc-work-area"><div class="gc-title"><h2 id="gc-role"></h2><p id="gc-task"></p></div><div id="gc-status" class="gc-status"></div><div id="gc-decision"></div><div id="gc-history" class="gc-history" aria-live="polite"></div><div class="gc-composer-wrap"><form id="gc-form" class="gc-composer"><label class="sr-only" for="gc-message">Поручение ИИ-помощнику</label><textarea id="gc-message" maxlength="4000" placeholder="Чем я могу помочь?" required></textarea><div id="gc-attachments" class="gc-attachments"></div><div class="gc-compose-tools"><div class="gc-tool-left"><button type="button" data-gc-action="attach" aria-label="Добавить демо-материал">＋</button><button type="button" data-gc-action="context" aria-label="Задание и контекст">▧</button><button type="button" class="gc-agent-picker" data-gc-action="agents">＠ Агент <span>⌄</span></button></div><button id="gc-send" type="submit" aria-label="Отправить поручение из GigaCoWork">↑</button></div></form><div class="gc-integrations"><div><span>Б</span><span>С</span><span>₽</span></div><button data-gc-action="context">Материалы стола <span>⌄</span></button></div></div><div class="gc-suggestions">${suggestions.map((s,i)=>`<button data-gc-suggest="${i}"><span>${['▤','◷','?'][i]}</span>${s}</button>`).join('')}</div><div id="gc-popover" class="gc-popover hidden"></div><p class="gc-training-note">Учебная эмуляция интерфейса. Сообщение запускает сценарий ИИ-помощника; реальное подключение GigaCoWork не используется.</p><button class="gc-watch" data-view="company">Наблюдать за помощью ИИ на схеме →</button></div><button class="gc-help" data-gc-action="help" aria-label="Помощь">?</button></main></div>`;
+    $('#cowork-screen').innerHTML=`<div class="gc-app"><aside class="gc-rail"><span class="gc-rail-symbol">◫</span><button data-gc-action="search" aria-label="Найти стол">⌕</button><button class="selected" data-gc-action="spaces" aria-label="Все пространства">▱</button><button data-view="company" aria-label="Посмотреть работу команды">↗</button><div class="gc-rail-bottom"><button data-gc-action="help" aria-label="Как играть">?</button><span>УЧ</span></div></aside><aside class="gc-sidebar"><div class="gc-logo" aria-label="GigaCoWork">GIGA<br>COWORK</div><button data-gc-action="personal">Личное пространство</button><button data-gc-action="spaces">Все пространства</button><div class="gc-section-heading">Избранные <span>⌄</span></div><div id="gc-spaces"></div><button class="gc-muted" data-gc-action="spaces">Показать все столы</button><div class="gc-section-heading">Недавние <span>⌄</span></div><button id="gc-recent" data-gc-action="personal"></button><div class="gc-sidebar-note">Человек формулирует задачу.<br>ИИ готовит результат.<br>Человек проверяет и решает.</div></aside><main class="gc-main"><div class="gc-topbar"><button class="gc-back" data-gc-action="spaces">☰ Столы</button><div class="gc-participants"><span>К</span><span>М</span><span>Д</span><span>П</span></div><label class="gc-select-wrap"><span class="sr-only">Рабочее место стола</span><select id="gc-table-select"></select></label><button class="gc-more" data-gc-action="context" aria-label="Контекст стола">⋮</button></div><div class="gc-work-area"><div class="gc-title"><h2 id="gc-role"></h2><p id="gc-task"></p></div><div id="gc-status" class="gc-status"></div><div id="gc-history" class="gc-history" aria-live="polite"></div><div class="gc-composer-wrap"><form id="gc-form" class="gc-composer"><label class="sr-only" for="gc-message">Поручение ИИ-помощнику</label><textarea id="gc-message" maxlength="4000" placeholder="Чем я могу помочь?" required></textarea><div id="gc-attachments" class="gc-attachments"></div><div class="gc-compose-tools"><div class="gc-tool-left"><button type="button" data-gc-action="attach" aria-label="Добавить демо-материал">＋</button><button type="button" data-gc-action="context" aria-label="Задание и контекст">▧</button><button type="button" class="gc-agent-picker" data-gc-action="agents">＠ Агент <span>⌄</span></button></div><button id="gc-send" type="submit" aria-label="Отправить поручение из GigaCoWork">↑</button></div></form><div class="gc-integrations"><div><span>Б</span><span>С</span><span>₽</span></div><button data-gc-action="context">Материалы стола <span>⌄</span></button></div></div><div class="gc-suggestions">${suggestions.map((s,i)=>`<button data-gc-suggest="${i}"><span>${['▤','◷','?'][i]}</span>${s}</button>`).join('')}</div><div id="gc-popover" class="gc-popover hidden"></div><p class="gc-training-note">Учебная эмуляция интерфейса. Сообщение запускает сценарий ИИ-помощника; реальное подключение GigaCoWork не используется.</p><button class="gc-watch" data-view="company">Наблюдать за помощью ИИ на схеме →</button></div><button class="gc-help" data-gc-action="help" aria-label="Помощь">?</button></main></div>`;
     $('#gc-message').oninput=e=>drafts[selected]=e.target.value;
     $('#gc-form').onsubmit=e=>{e.preventDefault();if(!demo.active)send()};
     $('#gc-message').onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('#gc-form').requestSubmit()}};
@@ -27,20 +27,24 @@ window.CoWork = (() => {
     $('#gc-role').textContent=a.name;$('#gc-task').textContent=a.task;
     const status={waiting:'Сначала дождитесь входных данных от коллег.',ready:'Ваш ход: задайте поручение ИИ-помощнику.',working:'ИИ помогает с задачей. Его действия видны на схеме.',approval:'ИИ подготовил заказ. Капитан команды должен согласовать закупку.',done:'Помощник подготовил результат и передал его коллегам.'};
     $('#gc-status').textContent=!s.started?(table===1?'Начните с поручения: что подготовить, для кого и к какому сроку.':'Сначала стол 01 запускает общее поручение.'):s.complete?'Команда выполнила задачу. Результат ИИ доступен для проверки.':status[a.status];
-    $('#gc-decision').innerHTML=table===6&&a.status==='approval'?`<div class="gc-human-decision"><b>Рекомендация ИИ готова. Решение — за вами.</b><p>${s.order.quantity} подарков · ${s.order.total} ₽ · лимит ${s.config.budget} ₽</p><button data-gc-action="approve" ${s.order.total>s.config.budget?'disabled':''}>Согласовать закупку от имени капитана</button></div>`:'';
-    const signature=JSON.stringify([s.id,table,a.status,a.output,s.events.length]);
+    const decision=table===6&&a.status==='approval'?`<div class="gc-human-decision"><b>Рекомендация ИИ готова. Решение — за вами.</b><p>${s.order.quantity} подарков · ${s.order.total} ₽ · лимит ${s.config.budget} ₽</p><button data-gc-action="approve" ${s.order.total>s.config.budget?'disabled':''}>Согласовать закупку от имени капитана</button></div>`:'';
+    const signature=JSON.stringify([s.id,table,a.status,a.output,s.events.length,reviewChats[table]]);
     if(signature!==lastSignature){
       lastSignature=signature;
+      const history=$('#gc-history'),oldScroll=history.scrollTop;
+      const follow=demo.active||history.scrollHeight-history.clientHeight-oldScroll<40;
       const user=s.messages.filter(m=>m.table===table).map(m=>`<article class="gc-user-message"><small>ВЫ · ЧЕЛОВЕК СТАВИТ ЗАДАЧУ</small><p>${h(m.text)}</p></article>`).join('');
       const incoming=s.events.filter(e=>e.kind==='transfer'&&e.data?.to===table).map(e=>`<article class="gc-incoming"><small>ВХОДЯЩИЕ ДАННЫЕ · ${h(s.agents[e.data.from-1].name)}</small><p>${h(e.text)}</p></article>`).join('');
       const notes=s.events.filter(e=>e.kind==='dialogue'&&e.table===table).map(e=>`<article class="gc-agent-note"><small>ИИ-ПОМОЩНИК · ПОЯСНЕНИЕ ПО СЦЕНАРИЮ</small><p>${h(e.text)}</p></article>`).join('');
-      $('#gc-history').innerHTML=incoming+user+notes+(a.output?`<article class="gc-agent-result"><small>РЕЗУЛЬТАТ ДЛЯ ПРОВЕРКИ ЧЕЛОВЕКОМ</small>${formatOutput(a.output)}</article>`:'');
+      const review=(reviewChats[table]||[]).map(m=>`<article class="${m.speaker==='user'?'gc-user-message gc-review-question':'gc-agent-note gc-review-reply'}"><small>${m.speaker==='user'?'УЧАСТНИК · УТОЧНЕНИЕ':'ИИ-ПОМОЩНИК · ОТВЕТ'}</small><p>${h(m.text)}</p></article>`).join('');
+      $('#gc-history').innerHTML=incoming+user+notes+(a.output?`<article class="gc-agent-result"><small>РЕЗУЛЬТАТ ДЛЯ ПРОВЕРКИ ЧЕЛОВЕКОМ</small>${formatOutput(a.output)}</article>`:'')+review+decision;
       $('#gc-history').classList.toggle('empty-history',!$('#gc-history').innerHTML);
+      history.scrollTop=follow?history.scrollHeight:oldScroll;
     }
     if(document.activeElement!==$('#gc-message'))$('#gc-message').value=drafts[table]||'';
     $('#gc-send').disabled=!ready(a)||busy||demo.active;
     $('#gc-message').readOnly=demo.active;
-    $('#gc-message').disabled=a.status==='done'||s.complete;
+    $('#gc-message').disabled=!demo.active&&(a.status==='done'||s.complete);
     $('#gc-attachments').innerHTML=(attached[table]||[]).map(f=>`<span>▤ ${h(f)}</span>`).join('');
     renderDemoControls();
     $('.gc-agent-picker').innerHTML=`＠ ${h(a.name)} <span>⌄</span>`;
@@ -57,14 +61,13 @@ window.CoWork = (() => {
   function renderDemoControls(){
     const status=$('#gc-demo-status');if(!status)return;
     if($('#gc-table-select'))$('#gc-table-select').disabled=demo.active;
-    if($('#table-select'))$('#table-select').disabled=demo.active;
     document.querySelectorAll('[data-cowork-table],[data-gc-suggest],.gc-agent-picker').forEach(el=>el.disabled=demo.active);
     status.textContent=demo.caption;
     document.querySelectorAll('[data-start-table-demo]').forEach(el=>el.disabled=demo.active);
     $('#gc-demo-pause').disabled=!demo.active;$('#gc-demo-pause').textContent=demo.paused?'▶ Продолжить':'Ⅱ Пауза';
     $('#gc-demo-stop').disabled=!demo.active;
     if(document.activeElement!==$('#gc-demo-speed'))$('#gc-demo-speed').value=latest?.config.speed||2;
-    $('.gc-app')?.classList.toggle('is-typing',demo.active&&demo.stage==='typing'&&!demo.paused);
+    $('.gc-app')?.classList.toggle('is-typing',demo.active&&demo.stage.includes('typing')&&!demo.paused);
   }
   function cancelDemo(){
     demo.active=false;demo.paused=false;demo.token++;demo.stage='';
@@ -100,20 +103,47 @@ window.CoWork = (() => {
       10:'Подготовь для команды план выдачи: по одному подарку гостю за десятью столами. Отдельно покажи оставшийся резерв.'
     }[id];
   }
+  async function typeInto(text,token){
+    drafts[selected]='';$('#gc-message').value='';$('#gc-message').focus({preventScroll:true});
+    for(const letter of text){await checkpoint(token);drafts[selected]+=letter;$('#gc-message').value=drafts[selected];$('#gc-message').scrollTop=$('#gc-message').scrollHeight;await delay(Math.max(9,65/latest.config.speed),token)}
+  }
+  async function reviewDialogue(id,token){
+    const o=latest.order;
+    const pair={
+      1:['Что ты подготовил для команды?','Зафиксировал подарок, получателей и срок. Передал коллегам две задачи: рассчитать тираж и подготовить макет.'],
+      2:[`Почему тираж ${o.quantity}, если получателей 100?`,`Убрал 8 дублей из 108 записей. Осталось 100 партнёров; добавил ${o.reserve} подарков в резерв по выбранному правилу.`],
+      3:['Упаковка и доставка точно учтены?',`Да. ${o.quantity} × (420 ₽ за шар + 80 ₽ за упаковку) + 5 000 ₽ за доставку = ${o.total} ₽. Это полная смета для вашей проверки.`],
+      4:['Какую версию передаём дальше?',`Макет ${o.design}, версия ${o.version}. Цвет: ${o.color}. Одинаковую версию увидят бренд-контроль и закупки.`],
+      5:['Что именно проверено в макете?','Проверены файл логотипа, пропорции, цвет и читаемость. Версия зафиксирована, результат проверки передан закупкам.'],
+      6:['Ты отправил заказ только после моего решения?','Да. Я объединил тираж, смету и макет, а решение о закупке осталось за капитаном. Заказ передан производителю после согласования.'],
+      7:['Сколько коробок передаём логистике?',`Для партии ${o.quantity} подарков подготовлено ${o.boxes} коробок, до 20 подарков в каждой. Количество и дата отгрузки переданы логистике.`],
+      8:['Что сообщено приёмке?','Переданы адрес площадки, число коробок и статус прибытия. Теперь команда приёмки может сверить доставленную партию с заказом.'],
+      9:['Есть расхождения с заказом?',`Нет. По демо-акту принято ${o.accepted} подарков; количество, упаковка и макет соответствуют заказу. Остаток передан на выдачу.`],
+      10:['Как распределён резерв?',`Команда выдаёт по 10 подарков каждому из 10 столов. Ещё ${o.reserve} подарков остаются отдельным запасом для дополнительных гостей.`]
+    }[id];
+    caption(`Стол ${String(id).padStart(2,'0')} · участник уточняет результат у ИИ-помощника.`, 'review-typing');
+    await typeInto(pair[0],token);await delay(Math.max(300,1000/latest.config.speed),token);
+    reviewChats[id]||=[];reviewChats[id].push({speaker:'user',text:pair[0]});
+    drafts[id]='';$('#gc-message').value='';render(latest,id);
+    caption(`Стол ${String(id).padStart(2,'0')} · ИИ отвечает на уточнение участника.`, 'reply');
+    await delay(Math.max(450,2200/latest.config.speed),token);
+    const reply={speaker:'agent',text:''};reviewChats[id].push(reply);
+    for(const word of pair[1].split(' ')){await checkpoint(token);reply.text+=(reply.text?' ':'')+word;render(latest,id);await delay(Math.max(45,160/latest.config.speed),token)}
+    caption(`Стол ${String(id).padStart(2,'0')} · участник читает ответ и проверяет результат.`, 'review');
+    await delay(Math.max(1400,6000/latest.config.speed),token);
+  }
   async function startDemo(){
     if(demo.active)return;
     if(latest.started){window.toast('Сначала начните новую игру для показа ввода за столами.');return}
     demo.active=true;demo.paused=false;const token=++demo.token;
     try{
-      $('#manual').checked=true;$('#auto-approve').checked=false;
-      await window.saveConfig();await window.api('/api/action',{action:'set-mode',auto:false});
+      await window.api('/api/config',{auto_approve:false});await window.api('/api/action',{action:'set-mode',auto:false});
       for(const id of [1,2,4,3,5,6,7,8,9,10]){
         await until(()=>id===1&&!latest.started||latest.agents[id-1].status==='ready',token);
         window.selectTable(id,true,true);
         caption(`Стол ${String(id).padStart(2,'0')} · участники формулируют поручение своему ИИ-помощнику.`, 'typing');
-        const text=promptFor(id);drafts[id]='';$('#gc-message').value='';$('#gc-message').focus();
-        for(const letter of text){await checkpoint(token);drafts[id]+=letter;$('#gc-message').value=drafts[id];$('#gc-message').scrollTop=$('#gc-message').scrollHeight;await delay(Math.max(5,35/latest.config.speed),token)}
-        await delay(Math.max(180,450/latest.config.speed),token);
+        await typeInto(promptFor(id),token);
+        await delay(Math.max(350,1500/latest.config.speed),token);
         caption(`Стол ${String(id).padStart(2,'0')} · участник отправляет поручение. ИИ помогает с задачей.`, 'working');
         $('#gc-send').disabled=false;$('#gc-send').classList.add('demo-click');
         if(!await send())throw Error('Поручение не принято. Проверьте состояние стола.');
@@ -122,13 +152,14 @@ window.CoWork = (() => {
           await until(()=>latest.agents[5].status==='approval',token);
           caption('Стол 06 · капитан проверяет рекомендацию ИИ и принимает решение о закупке. Это автопоказ действий человека.', 'review');
           if(latest.order.total>latest.config.budget)throw Error('Команда заметила превышение бюджета. Начните новую игру с достаточным лимитом.');
-          await delay(Math.max(550,1500/latest.config.speed),token);
+          await delay(Math.max(1200,6000/latest.config.speed),token);
           const approve=$('[data-gc-action="approve"]');approve?.classList.add('demo-click');
           await delay(200,token);await window.api('/api/action',{action:'approve',synthetic:true});
         }
         await until(()=>latest.agents[id-1].status==='done',token);
         caption(`Стол ${String(id).padStart(2,'0')} · участники проверяют подготовленный ИИ результат.`, 'review');
-        await delay(Math.max(450,1300/latest.config.speed),token);
+        await delay(Math.max(1400,6500/latest.config.speed),token);
+        await reviewDialogue(id,token);
       }
       caption('Команда выполнила задачу: люди поставили поручения и приняли решения, ИИ помог подготовить и передать результаты.');
     }catch(e){if(e.message!=='DEMO_STOPPED'){caption(e.message);window.toast(e.message)}}
@@ -152,7 +183,7 @@ window.CoWork = (() => {
     const table=e.target.closest('[data-cowork-table],[data-open-cowork]');
     if(table){window.selectTable(Number(table.dataset.coworkTable||table.dataset.openCowork),true);$('#gc-popover').classList.add('hidden');return}
     const suggestion=e.target.closest('[data-gc-suggest]');
-    if(suggestion){const a=latest.agents[selected-1],index=Number(suggestion.dataset.gcSuggest);drafts[selected]=index===0?`Подготовь результат по задаче «${a.task}». Используй материалы стола и передай его коллегам.`:index===1?`Выполни расчёты для задачи «${a.task}», проверь данные и покажи итог для моего решения.`:`Выполни задачу «${a.task}» по демо-брифу и кратко поясни результат.`;$('#gc-message').value=drafts[selected];$('#gc-message').focus();return}
+    if(suggestion){const a=latest.agents[selected-1],index=Number(suggestion.dataset.gcSuggest);drafts[selected]=index===0?`Подготовь результат по задаче «${a.task}». Используй материалы стола и передай его коллегам.`:index===1?`Выполни расчёты для задачи «${a.task}», проверь данные и покажи итог для моего решения.`:`Выполни задачу «${a.task}» по демо-брифу и кратко поясни результат.`;$('#gc-message').value=drafts[selected];$('#gc-message').focus({preventScroll:true});return}
     const action=e.target.closest('[data-gc-action]')?.dataset.gcAction;
     if(!action)return;
     if(action==='approve')window.safe(()=>window.api('/api/action',{action:'approve'}));
