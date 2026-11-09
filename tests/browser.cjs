@@ -7,7 +7,7 @@ const base=process.env.GAME_TEST_URL||'http://127.0.0.1:8001';
  await page.evaluate(()=>window.api('/api/action',{action:'reset'}));
  await page.click('[data-speed="4"]');await page.click('#quick-demo');
  await page.waitForSelector('#approve',{timeout:20000});await page.click('#approve');
- await page.waitForFunction(()=>document.querySelector('#game-status').textContent==='Готово к вручению',null,{timeout:20000});
+ await page.waitForFunction(()=>document.querySelectorAll('.flow-node.done').length===10,null,{timeout:20000});
  await page.locator('[data-agent="10"]').click();await page.waitForSelector('.result-table');
  if(!(await page.locator('#agent-detail').innerText()).includes('К выдаче'))throw Error('Missing final result');
  await page.click('.dialog-close');await page.click('.tab[data-view="journal"]');

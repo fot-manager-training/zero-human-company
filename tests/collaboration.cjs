@@ -52,7 +52,7 @@ const base=process.env.GAME_TEST_URL||'http://127.0.0.1:8002/zero-human-company/
   await page.click('.tab[data-view="cowork"]');await page.selectOption('#gc-table-select','6');
   await page.waitForSelector('[data-gc-action="approve"]');await page.click('[data-gc-action="approve"]');
   await page.click('.tab[data-view="company"]');await page.click('[data-speed="16"]');
-  await page.waitForFunction(()=>document.querySelector('#game-status').textContent==='Готово к вручению',null,{timeout:15000});
+  await page.waitForFunction(()=>document.querySelectorAll('.flow-node.done').length===10,null,{timeout:15000});
   await page.click('.tab[data-view="cowork"]');await page.selectOption('#gc-table-select','10');
   if(!(await page.locator('#gc-history').innerText()).includes('РЕЗУЛЬТАТ ДЛЯ ПРОВЕРКИ ЧЕЛОВЕКОМ'))throw Error('Human review output missing');
   for(const view of ['cowork','company']){

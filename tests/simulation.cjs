@@ -24,7 +24,7 @@ const base = process.env.GAME_TEST_URL || 'http://127.0.0.1:8002/zero-human-comp
     await page.click('[data-speed="16"]');
     await page.waitForFunction(()=>document.querySelector('[data-speed="16"]').classList.contains('active'));
     await page.click('#flow-pause');
-    await page.waitForFunction(()=>document.querySelector('#game-status').textContent==='Готово к вручению',null,{timeout:15000});
+    await page.waitForFunction(()=>document.querySelectorAll('.flow-node.done').length===10,null,{timeout:15000});
     const s=await getState();
     if(s.order.quantity!==110||s.order.total!==60000||!s.config.auto_approve)throw Error('Wrong synthetic result');
     if(s.events.filter(e=>e.kind==='transfer').length!==12)throw Error('Missing transfers');
