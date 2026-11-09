@@ -130,7 +130,7 @@
           }
           game.running = true;
         } else if (p.action === 'approve') {
-          approve(false);
+          approve(!!p.synthetic);
         } else throw Error('Неизвестное действие');
         save();
       } else throw Error('В браузерном демо этот API недоступен');

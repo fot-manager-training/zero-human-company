@@ -4,7 +4,7 @@ const money = n => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).form
 const states = {waiting:'Ожидает',ready:'Ваш ход',working:'Работает',approval:'Согласование',done:'Готово'};
 const colors = ['#607aa8','#6e9e88','#ae9765','#a58bb4','#6c9d9c','#7b8da4','#c29a6a','#6c9eaf','#859f79','#b98c94'];
 const icons = ['case','list','calc','pencil','glass','case','box','box','list','gift'];
-let state, selected = 1, currentView='company', lastRevision=-1, pollBusy=false, modalAgent=null, toastTimer, quickPending=false;
+let state, selected = 1, currentView='company', lastRevision=-1, pollBusy=false, modalAgent=null, toastTimer, quickPending=false, tableDemoPending=false;
 function avatar(a){
  const n=a.id, c=colors[n-1], hair=['#574d46','#554840','#414850','#6b493b','#64584a'][n%5];
  let accessory='';
@@ -48,7 +48,7 @@ function renderTerminal(){if(!$('#table-select').options.length)$('#table-select
  $('#send').disabled=!available;$('#message').disabled=!available;
  $('#message').placeholder=available?'Напишите поручение агенту…':a.status==='done'?'Результат передан следующему агенту':a.status==='working'?'Агент выполняет поручение…':'Ожидаем входящие данные';
 }
-function selectTable(n,openScreen=false){selected=n;if(openScreen||currentView==='cowork'){const url=new URL(location.href);url.searchParams.set('table',n);history.replaceState(null,'',url)}renderTerminal();window.CoWork.render(state,selected);if(openScreen)showView('cowork');}
+function selectTable(n,openScreen=false,scripted=false){if(window.CoWork.isPlaying()&&!scripted){toast('Остановите автопоказ, чтобы выбрать другой стол вручную.');return}selected=n;if(openScreen||currentView==='cowork'){const url=new URL(location.href);url.searchParams.set('table',n);history.replaceState(null,'',url)}renderTerminal();window.CoWork.render(state,selected);if(openScreen)showView('cowork');}
 function showView(view){currentView=view;for(const key of ['company','cowork','conversation','architecture','tables','journal'])$('#'+key+'-view').classList.toggle('hidden',view!==key);document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));history.replaceState(null,'','#'+view);}
 function renderDetail(n){const a=state.agents[n-1];$('#agent-detail').innerHTML=`<div class="detail-avatar">${avatar(a)}</div><div class="dialog-eyebrow">СТОЛ ${String(n).padStart(2,'0')} / ${states[a.status]}</div><h2>${esc(a.name)}</h2><p>${esc(a.task)}</p><div class="detail-task">${esc(a.instruction)}<br><small>Демонстрационный движок исполняет фиксированные правила этой роли.</small></div>${a.output?'<h3>Результат работы</h3><table class="result-table">'+Object.entries(a.output).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(typeof v==='object'?Object.entries(v).map(([k,v])=>`Стол ${k}: ${v}`).join(' · '):v)}</td></tr>`).join('')+'</table>':'<p>Результат появится после выполнения задачи агентом.</p>'}<div class="dialog-actions"><button class="button primary-button" data-open-terminal="${n}">Открыть терминал стола →</button></div>`}
 async function safe(fn){try{await fn()}catch(e){toast(e.message)}}
@@ -58,7 +58,7 @@ document.addEventListener('click',e=>{
  const table=e.target.closest('[data-table]');if(table)selectTable(Number(table.dataset.table),true);
  const open=e.target.closest('[data-open-terminal]');if(open){$('#agent-dialog').close();selectTable(Number(open.dataset.openTerminal),true)}
  const speed=e.target.closest('[data-speed]');if(speed)safe(()=>api('/api/config',{speed:Number(speed.dataset.speed)}));
- if(e.target.closest('#approve'))safe(()=>api('/api/action',{action:'approve'}));
+ if(e.target.closest('#approve,[data-scene-approve]'))safe(()=>api('/api/action',{action:'approve'}));
 });
 $('#agent-dialog .dialog-close').onclick=()=>$('#agent-dialog').close();$('#agent-dialog').addEventListener('close',()=>modalAgent=null);
 $('#table-select').onchange=e=>selectTable(Number(e.target.value));
@@ -70,16 +70,21 @@ $('#message-form').onsubmit=e=>{e.preventDefault();const text=$('#message').valu
 $('#message').onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('#message-form').requestSubmit()}};
 async function saveConfig(){await api('/api/config',{reserve:Number($('#reserve').value),budget:Number($('#budget').value),design:$('#design').value,speed:Number($('#speed').value),auto_approve:$('#auto-approve').checked})}
 $('#play').onclick=()=>safe(async()=>{if(!state.started){const auto=!$('#manual').checked;await saveConfig();await api('/api/action',{action:'start',auto})}else await api('/api/action',{action:state.running?'pause':'resume'})});
-$('#reset').onclick=()=>{quickPending=false;$('#reset-dialog').showModal()};$('#cancel-reset').onclick=()=>{quickPending=false;$('#reset-dialog').close()};$('#confirm-reset').onclick=()=>safe(async()=>{selected=1;await api('/api/action',{action:'reset'});$('#reset-dialog').close();$('#message').value='';if(quickPending){quickPending=false;await quickStart()}else toast('Новая компания готова к работе')});
+$('#reset').onclick=()=>{quickPending=false;tableDemoPending=false;$('#reset-dialog').showModal()};$('#cancel-reset').onclick=()=>{quickPending=false;tableDemoPending=false;$('#reset-dialog').close()};$('#confirm-reset').onclick=()=>safe(async()=>{window.CoWork.cancelDemo();selected=1;await api('/api/action',{action:'reset'});$('#reset-dialog').close();$('#message').value='';if(tableDemoPending){tableDemoPending=false;await window.CoWork.startDemo()}else if(quickPending){quickPending=false;await quickStart()}else toast('Новая компания готова к работе')});
 $('#export').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`company-${state.id}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+async function requestTableDemo(){document.body.classList.remove('presenting');$('#present-mode').textContent='⛶ На большой экран';if(state.started){tableDemoPending=true;quickPending=false;$('#reset-dialog').showModal()}else await window.CoWork.startDemo()}
 async function quickStart(){
  $('#manual').checked=false;await saveConfig();await api('/api/action',{action:'start',auto:true});showView('company');
 }
-$('#quick-demo').onclick=()=>safe(async()=>{if(state.started){quickPending=true;$('#reset-dialog').showModal()}else await quickStart()});
+$('#reset-dialog').addEventListener('cancel',()=>{tableDemoPending=false;quickPending=false});
+$('#quick-demo').onclick=()=>safe(async()=>{tableDemoPending=false;if(state.started){quickPending=true;$('#reset-dialog').showModal()}else await quickStart()});
+$('#present-mode').onclick=()=>{const enabled=document.body.classList.toggle('presenting');$('#present-mode').textContent=enabled?'↙ Обычный вид':'⛶ На большой экран'};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('presenting');$('#present-mode').textContent='⛶ На большой экран'}});
 $('#flow-pause').onclick=()=>safe(()=>api('/api/action',{action:state.running?'pause':'resume'}));
 $('#speed').onchange=()=>safe(()=>api('/api/config',{speed:Number($('#speed').value)}));
 $('#auto-approve').onchange=()=>safe(()=>api('/api/config',{auto_approve:$('#auto-approve').checked}));
 $('#manual').onchange=()=>{if($('#manual').checked){$('#auto-approve').checked=false;safe(()=>api('/api/config',{auto_approve:false}))}};
 $('#conversation-filter').onchange=()=>window.GameVisuals.render(state);
 document.addEventListener('keydown',e=>{const agent=e.target.closest('[data-agent]');if(agent&&(e.key==='Enter'||e.key===' ')){e.preventDefault();agent.dispatchEvent(new MouseEvent('click',{bubbles:true}))}});
+window.addEventListener('hashchange',()=>{const view=location.hash.slice(1);if(['company','cowork','conversation','architecture','tables','journal'].includes(view))showView(view)});
 async function init(){const requestedTable=Number(new URL(location.href).searchParams.get('table'));if(Number.isInteger(requestedTable)&&requestedTable>=1&&requestedTable<=10)selected=requestedTable;await refresh();if(state){$('#table-select').innerHTML=state.agents.map(a=>`<option value="${a.id}">${String(a.id).padStart(2,'0')} · ${esc(a.name)}</option>`).join('');renderTerminal();}const initialView=location.hash.slice(1)||(requestedTable>=1&&requestedTable<=10?'cowork':'');if(['company','cowork','conversation','architecture','tables','journal'].includes(initialView))showView(initialView);setInterval(refresh,250)}init();

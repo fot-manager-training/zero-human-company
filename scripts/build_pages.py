@@ -1,5 +1,6 @@
 """Build a standalone browser demo, retaining the Python service separately."""
 import json
+import hashlib
 import shutil
 import sys
 from pathlib import Path
@@ -39,6 +40,10 @@ def build(destination):
     html = html.replace('<script src="./app.js">', '<script src="./demo-data.js"></script><script src="./local-engine.js"></script><script src="./app.js">')
     html = html.replace('Сейчас это локальный чат. Внешние сообщения принимаются через API-адаптер GigaCoWork.', 'Учебная сессия сохраняется на этом устройстве. Для общей работы столов нужен сервер; внешний коннектор GigaCoWork ещё не подключён.')
     html = html.replace('Рабочее место ведущего', 'Настройки ведущего')
+    assets = sorted(p for p in destination.iterdir() if p.suffix in ('.js', '.css', '.svg'))
+    version = hashlib.sha256(b''.join(p.read_bytes() for p in assets)).hexdigest()[:12]
+    for asset in assets:
+        html = html.replace(f'./{asset.name}\"', f'./{asset.name}?v={version}\"')
     (destination/'index.html').write_text(html)
     (destination/'.nojekyll').touch()
     print(f'Built browser demo: {destination}')

@@ -1,0 +1,23 @@
+const {chromium}=require('playwright');
+const base=process.env.GAME_TEST_URL||'http://127.0.0.1:8002/zero-human-company/';
+(async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(base);await page.waitForSelector('.flow-node');
+ await page.evaluate(async()=>{await(window.gameTransport||fetch)('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})})});
+ await page.goto(base+'#cowork');await page.waitForSelector('#gc-message');
+ await page.selectOption('#gc-demo-speed','4');await page.locator('#cowork-view [data-start-table-demo]').click();
+ await page.waitForFunction(()=>document.querySelector('#gc-message').value.length>5);
+ await page.click('#gc-demo-pause');await page.waitForTimeout(100);
+ const paused=await page.locator('#gc-message').inputValue();await page.waitForTimeout(300);
+ if(await page.locator('#gc-message').inputValue()!==paused)throw Error('Typing continued while paused');
+ await page.screenshot({path:'/tmp/zh-cowork-typing.png',fullPage:true});
+ await page.selectOption('#gc-demo-speed','16');await page.click('#gc-demo-pause');
+ await page.waitForFunction(()=>document.querySelector('#gc-demo-status').textContent.startsWith('Команда выполнила задачу'),null,{timeout:45000});
+ const s=await page.evaluate(async()=>(await(window.gameTransport||fetch)('/api/state')).json());
+ if(!s.complete||s.messages.length!==10||s.auto)throw Error('Not all table prompts executed');
+ if(s.messages.map(m=>m.table).join(',')!=='1,2,4,3,5,6,7,8,9,10')throw Error('Wrong table demo sequence');
+ if(!s.events.some(e=>e.kind==='human'&&e.data?.synthetic))throw Error('Human review was not represented');
+ if(await page.locator('#gc-message').getAttribute('readonly')!==null)throw Error('Manual input was not restored');
+ if(errors.length)throw Error(errors.join('\n'));
+ console.log('PASS: visible typing, pause/resume, 10 GigaCoWork table prompts, simulated captain decision, completed results');
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});
