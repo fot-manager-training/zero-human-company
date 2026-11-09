@@ -69,3 +69,34 @@ body.cowork-active .gc-content-layout .gc-work-area{max-width:none;min-width:0}
 .hero-object{right:0;top:0;width:47%;height:315px;opacity:1}
 .hero-object img{object-fit:contain;filter:none}
 @media(max-width:750px){.collaboration-heading{display:flex;flex-direction:column;align-items:flex-start;min-height:0;padding:32px 0 12px;gap:0}.collaboration-heading h1{font-size:31px;max-width:100%;letter-spacing:-.7px}.hero-copy{order:1}.collaboration-heading .human-start{order:2;max-width:100%;margin-top:23px}.hero-object{position:relative;order:3;width:100%;max-width:350px;height:235px;right:auto;top:auto;margin:14px auto 0;z-index:0;opacity:1}}
+
+/* Aligned process lanes with connectors anchored to the current card bounds. */
+.flow-scroll{background:#fff;border-color:#e4edf6;border-radius:20px}
+.process-svg{background:#fff}
+.flow-edge{stroke:#c4d3e3;stroke-width:1.7;stroke-dasharray:none;stroke-linecap:round;stroke-linejoin:round}
+.flow-edge.sent{stroke:#85afd5;stroke-width:1.9}
+.process-svg marker path{fill:none!important}
+.map-lane rect{fill:#f8faff;stroke:#edf2f8;stroke-width:1}
+.map-stage-heading{font:10px Arial,sans-serif;letter-spacing:1.1px;fill:#90a5bd}
+.map-edge-label rect{fill:#fff;stroke:none}
+.map-edge-label .edge-label{font:10px Arial,sans-serif;fill:#88a0b8;text-anchor:middle}
+.flow-node .node-card,.flow-node.collapsed .node-card{fill:#fff;stroke:#d9e5f1;stroke-width:1.3;filter:drop-shadow(0 3px 5px #7294b10b)}
+.flow-node.collapsed.done .node-card{fill:#fff;stroke:#cbdfee}
+.flow-node.ready .node-card,.flow-node.collapsed.ready .node-card{fill:#f9fcff;stroke:#a9c9e5}
+.flow-node.working .node-card{fill:#fff;stroke:#82b4e0;stroke-width:1.8}
+.flow-node.approval .node-card{fill:#fefff7;stroke:#c4d98c;stroke-width:1.8}
+.flow-node:hover .node-card,.flow-node:focus .node-card{stroke:#72a7d4;filter:drop-shadow(0 4px 8px #7da0c522)}
+.flow-node .node-name,.flow-node.collapsed .node-name,.flow-node.expanded .node-name{font:600 12px Arial,sans-serif;fill:#4b6a8c;text-anchor:start}
+.flow-node .node-status,.flow-node.collapsed .node-status{font:9px Arial,sans-serif;fill:#9eafbf;text-anchor:start}
+.flow-node.done .node-status{fill:#82a994}.flow-node.working .node-status{fill:#77a6cd}.flow-node.approval .node-status{fill:#9caa65}
+.flow-node .node-number{font:8px Arial,sans-serif;fill:#b7c7d6;text-anchor:end}
+.map-card-divider{fill:none;stroke:#edf2f7;stroke-width:1}
+.flow-node .node-summary{font:9px Arial,sans-serif;fill:#8da4bb;text-anchor:middle}
+.flow-node.expanded .map-explanation{height:67px;padding:9px 10px;border:0;border-radius:9px;background:#f0f7ff;box-shadow:none;color:#839db7;font:9px/1.5 Arial,sans-serif}
+.flow-node.expanded .map-explanation b{font-size:10px;font-weight:500;color:#6f98bc;margin-bottom:5px}
+.flow-node.expanded .map-explanation span{line-height:1.5;-webkit-line-clamp:2}
+.map-finish .node-card{fill:#f3f8fd;stroke:#dbe8f2;stroke-width:1.3}.map-finish circle{fill:#e5eff8}.map-finish .finish-icon{font:19px Arial;fill:#8dacc7;text-anchor:middle}.finish-title{font:600 11px Arial;fill:#6a8bab}.finish-detail{font:9px Arial;fill:#98aec2}.map-finish.complete .node-card{fill:#f5faf6;stroke:#d0e5d6}.map-finish.complete circle{fill:#e3f1e7}.map-finish.complete .finish-icon{fill:#78a38b}
+.map-dock-divider{fill:none;stroke:#edf2f7;stroke-width:1}.moving-message rect{fill:#f9fcff;stroke:#e0eaf5;stroke-width:1}.moving-message text{font-size:11px;fill:#7096ba}.moving-message .packet-text{font-size:10px;fill:#8fa5bb}.moving-message .packet-caption{font-size:8px;fill:#b2c2d2}
+body.presenting .flow-scroll{background:#fff}
+
+.flow-node .node-name,.flow-node.collapsed .node-name,.flow-node.expanded .node-name{font-size:14px}.flow-node .node-status,.flow-node.collapsed .node-status{font-size:10px}.flow-node .node-summary{font-size:10px}.map-stage-heading,.map-edge-label .edge-label{font-size:11px}.finish-title{font-size:12px}.finish-detail{font-size:10px}
