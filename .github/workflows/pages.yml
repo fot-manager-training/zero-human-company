@@ -48,7 +48,7 @@ jobs:
           python -c 'from pathlib import Path; assert "GigaNetwork" in Path("/tmp/zh-architecture.svg").read_text(); assert "GameVisuals" in Path("/tmp/zh-visualization.js").read_text()'
           curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "${DEMO_URL}cowork.js" -o /tmp/zh-cowork.js
           python -c 'from pathlib import Path; assert "CoWork" in Path("/tmp/zh-cowork.js").read_text()'
-          for asset in guide.js process.svg request.svg states.svg hero-ring.png blue-knot.png business-data.js workbench.js; do
+          for asset in guide.js process.svg request.svg states.svg hero-ring.png business-data.js workbench.js; do
             curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "${DEMO_URL}${asset}" -o "/tmp/zh-${asset}"
           done
           python -c 'from pathlib import Path; assert "HowItWorks" in Path("/tmp/zh-guide.js").read_text()'

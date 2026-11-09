@@ -36,7 +36,7 @@ def build(destination):
     template['config'].update(speed=2, auto_approve=False)
     data = {'template': template, 'variants': variants, 'brief': DEFAULT_BRIEF, 'work_notes': WORK_NOTES}
     (destination/'demo-data.js').write_text('window.ZH_DEMO_DATA = '+json.dumps(data, ensure_ascii=False)+';\n')
-    for name in ('app.js', 'style.css', 'local-engine.js', 'architecture.svg', 'visualization.js', 'cowork.js', 'guide.js', 'process.svg', 'request.svg', 'states.svg', 'hero-ring.png', 'blue-knot.png', 'business-data.js', 'workbench.js'):
+    for name in ('app.js', 'style.css', 'local-engine.js', 'architecture.svg', 'visualization.js', 'cowork.js', 'guide.js', 'process.svg', 'request.svg', 'states.svg', 'hero-ring.png', 'business-data.js', 'workbench.js'):
         shutil.copyfile(ROOT/'static'/name, destination/name)
     html = (ROOT/'static/index.html').read_text()
     html = html.replace('<script src="./app.js">', '<script src="./demo-data.js"></script><script src="./local-engine.js"></script><script src="./app.js">')
