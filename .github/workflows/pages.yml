@@ -36,3 +36,9 @@ jobs:
       - name: Publish demo
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify public demo
+        env:
+          DEMO_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors "$DEMO_URL" -o /tmp/zh-demo.html
+          python -c 'from pathlib import Path; content = Path("/tmp/zh-demo.html").read_text(); assert "./local-engine.js" in content and "./app.js" in content, "Published demo is incomplete"'
