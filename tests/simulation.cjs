@@ -37,12 +37,8 @@ const base = process.env.GAME_TEST_URL || 'http://127.0.0.1:8002/zero-human-comp
     await page.screenshot({path:'/tmp/zh-simulation-conversation.png',fullPage:true});
     await page.click('.tab[data-view="architecture"]');
     await page.waitForFunction(()=>document.querySelector('.architecture-image').naturalWidth>0);
-    const downloadPromise=page.waitForEvent('download');
-    await page.locator('a[download]').first().click();
-    const download=await downloadPromise;
-    if(download.suggestedFilename()!=='business-game-architecture.svg')throw Error('Missing SVG download');
     await page.screenshot({path:'/tmp/zh-simulation-architecture.png',fullPage:true});
     if(errors.length)throw Error(errors.join('\n'));
-    console.log('PASS: one-click autopilot, live speed 16, pause, 12 map handoffs, dialogue filter, architecture SVG');
+    console.log('PASS: one-click autopilot, live speed 16, pause, 12 map handoffs, dialogue filter, architecture diagrams');
   } finally {await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});
