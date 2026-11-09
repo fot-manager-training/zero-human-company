@@ -19,6 +19,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s tests -v
+      - run: python scripts/build_diagrams.py
       - run: python scripts/build_pages.py
       - uses: actions/configure-pages@v5
         with:
@@ -47,3 +48,7 @@ jobs:
           python -c 'from pathlib import Path; assert "GigaNetwork" in Path("/tmp/zh-architecture.svg").read_text(); assert "GameVisuals" in Path("/tmp/zh-visualization.js").read_text()'
           curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "${DEMO_URL}cowork.js" -o /tmp/zh-cowork.js
           python -c 'from pathlib import Path; assert "CoWork" in Path("/tmp/zh-cowork.js").read_text()'
+          for asset in guide.js process.svg request.svg states.svg hero-ring.png; do
+            curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "${DEMO_URL}${asset}" -o "/tmp/zh-${asset}"
+          done
+          python -c 'from pathlib import Path; assert "HowItWorks" in Path("/tmp/zh-guide.js").read_text()'

@@ -38,7 +38,7 @@ const base = process.env.GAME_TEST_URL || 'http://127.0.0.1:8002/zero-human-comp
     await page.click('.tab[data-view="architecture"]');
     await page.waitForFunction(()=>document.querySelector('.architecture-image').naturalWidth>0);
     const downloadPromise=page.waitForEvent('download');
-    await page.locator('a[download]').click();
+    await page.locator('a[download]').first().click();
     const download=await downloadPromise;
     if(download.suggestedFilename()!=='business-game-architecture.svg')throw Error('Missing SVG download');
     await page.screenshot({path:'/tmp/zh-simulation-architecture.png',fullPage:true});
